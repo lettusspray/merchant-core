@@ -14,16 +14,1469 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      business_hours: {
+        Row: {
+          closes_at: string | null
+          created_at: string
+          day_of_week: number
+          id: string
+          is_closed: boolean
+          location_id: string
+          opens_at: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          closes_at?: string | null
+          created_at?: string
+          day_of_week: number
+          id?: string
+          is_closed?: boolean
+          location_id: string
+          opens_at?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          closes_at?: string | null
+          created_at?: string
+          day_of_week?: number
+          id?: string
+          is_closed?: boolean
+          location_id?: string
+          opens_at?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_hours_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_hours_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          slug: string
+          tenant_id: string
+          updated_at: string
+          vertical: Database["public"]["Enums"]["vertical"]
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          slug: string
+          tenant_id: string
+          updated_at?: string
+          vertical?: Database["public"]["Enums"]["vertical"]
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
+          tenant_id?: string
+          updated_at?: string
+          vertical?: Database["public"]["Enums"]["vertical"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "categories_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contacts: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          label: string | null
+          merchant_id: string
+          tenant_id: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          label?: string | null
+          merchant_id: string
+          tenant_id: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          label?: string | null
+          merchant_id?: string
+          tenant_id?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacts_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discovery_candidates: {
+        Row: {
+          city: string | null
+          created_at: string
+          id: string
+          merchant_id: string | null
+          name: string
+          payload: Json
+          phone: string | null
+          provider: string
+          region: string | null
+          score: number
+          status: Database["public"]["Enums"]["discovery_status"]
+          tenant_id: string
+          updated_at: string
+          vertical: Database["public"]["Enums"]["vertical"]
+          website: string | null
+        }
+        Insert: {
+          city?: string | null
+          created_at?: string
+          id?: string
+          merchant_id?: string | null
+          name: string
+          payload?: Json
+          phone?: string | null
+          provider?: string
+          region?: string | null
+          score?: number
+          status?: Database["public"]["Enums"]["discovery_status"]
+          tenant_id: string
+          updated_at?: string
+          vertical?: Database["public"]["Enums"]["vertical"]
+          website?: string | null
+        }
+        Update: {
+          city?: string | null
+          created_at?: string
+          id?: string
+          merchant_id?: string | null
+          name?: string
+          payload?: Json
+          phone?: string | null
+          provider?: string
+          region?: string | null
+          score?: number
+          status?: Database["public"]["Enums"]["discovery_status"]
+          tenant_id?: string
+          updated_at?: string
+          vertical?: Database["public"]["Enums"]["vertical"]
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discovery_candidates_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discovery_candidates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          actor_id: string | null
+          actor_label: string | null
+          created_at: string
+          id: string
+          kind: string
+          payload: Json
+          subject_id: string | null
+          subject_type: string | null
+          tenant_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_label?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          payload?: Json
+          subject_id?: string | null
+          subject_type?: string | null
+          tenant_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_label?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          payload?: Json
+          subject_id?: string | null
+          subject_type?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      happening_reviews: {
+        Row: {
+          action: string
+          created_at: string
+          happening_id: string
+          id: string
+          notes: string | null
+          reviewer_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          happening_id: string
+          id?: string
+          notes?: string | null
+          reviewer_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          happening_id?: string
+          id?: string
+          notes?: string | null
+          reviewer_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "happening_reviews_happening_id_fkey"
+            columns: ["happening_id"]
+            isOneToOne: false
+            referencedRelation: "happenings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "happening_reviews_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      happenings: {
+        Row: {
+          ai_confidence: number | null
+          body: string | null
+          created_at: string
+          ends_at: string | null
+          id: string
+          kind: Database["public"]["Enums"]["happening_kind"]
+          merchant_id: string
+          published_at: string | null
+          source_record_id: string | null
+          starts_at: string | null
+          status: Database["public"]["Enums"]["happening_status"]
+          tenant_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          ai_confidence?: number | null
+          body?: string | null
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["happening_kind"]
+          merchant_id: string
+          published_at?: string | null
+          source_record_id?: string | null
+          starts_at?: string | null
+          status?: Database["public"]["Enums"]["happening_status"]
+          tenant_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          ai_confidence?: number | null
+          body?: string | null
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["happening_kind"]
+          merchant_id?: string
+          published_at?: string | null
+          source_record_id?: string | null
+          starts_at?: string | null
+          status?: Database["public"]["Enums"]["happening_status"]
+          tenant_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "happenings_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "happenings_source_record_id_fkey"
+            columns: ["source_record_id"]
+            isOneToOne: false
+            referencedRelation: "source_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "happenings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      integrations: {
+        Row: {
+          category: string
+          config: Json
+          created_at: string
+          id: string
+          mode: string
+          provider: string
+          status: Database["public"]["Enums"]["connector_status"]
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          config?: Json
+          created_at?: string
+          id?: string
+          mode?: string
+          provider: string
+          status?: Database["public"]["Enums"]["connector_status"]
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          config?: Json
+          created_at?: string
+          id?: string
+          mode?: string
+          provider?: string
+          status?: Database["public"]["Enums"]["connector_status"]
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integrations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      locations: {
+        Row: {
+          address_line1: string | null
+          address_line2: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          id: string
+          is_primary: boolean
+          label: string
+          latitude: number | null
+          longitude: number | null
+          merchant_id: string
+          phone: string | null
+          postal_code: string | null
+          region: string | null
+          tenant_id: string
+          timezone: string | null
+          updated_at: string
+        }
+        Insert: {
+          address_line1?: string | null
+          address_line2?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          label: string
+          latitude?: number | null
+          longitude?: number | null
+          merchant_id: string
+          phone?: string | null
+          postal_code?: string | null
+          region?: string | null
+          tenant_id: string
+          timezone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address_line1?: string | null
+          address_line2?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          label?: string
+          latitude?: number | null
+          longitude?: number | null
+          merchant_id?: string
+          phone?: string | null
+          postal_code?: string | null
+          region?: string | null
+          tenant_id?: string
+          timezone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "locations_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "locations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      memberships: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["tenant_role"]
+          tenant_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["tenant_role"]
+          tenant_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["tenant_role"]
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memberships_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      merchants: {
+        Row: {
+          brand_color: string | null
+          created_at: string
+          data_quality: number
+          description: string | null
+          id: string
+          logo_url: string | null
+          name: string
+          primary_category_id: string | null
+          slug: string
+          status: Database["public"]["Enums"]["merchant_status"]
+          tagline: string | null
+          tenant_id: string
+          updated_at: string
+          vertical: Database["public"]["Enums"]["vertical"]
+        }
+        Insert: {
+          brand_color?: string | null
+          created_at?: string
+          data_quality?: number
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          name: string
+          primary_category_id?: string | null
+          slug: string
+          status?: Database["public"]["Enums"]["merchant_status"]
+          tagline?: string | null
+          tenant_id: string
+          updated_at?: string
+          vertical?: Database["public"]["Enums"]["vertical"]
+        }
+        Update: {
+          brand_color?: string | null
+          created_at?: string
+          data_quality?: number
+          description?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+          primary_category_id?: string | null
+          slug?: string
+          status?: Database["public"]["Enums"]["merchant_status"]
+          tagline?: string | null
+          tenant_id?: string
+          updated_at?: string
+          vertical?: Database["public"]["Enums"]["vertical"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "merchants_primary_category_id_fkey"
+            columns: ["primary_category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "merchants_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      observations: {
+        Row: {
+          confidence: number
+          created_at: string
+          current_value: string | null
+          field_path: string
+          id: string
+          merchant_id: string
+          observed_at: string
+          observed_value: string | null
+          source_record_id: string | null
+          status: Database["public"]["Enums"]["observation_status"]
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          confidence?: number
+          created_at?: string
+          current_value?: string | null
+          field_path: string
+          id?: string
+          merchant_id: string
+          observed_at?: string
+          observed_value?: string | null
+          source_record_id?: string | null
+          status?: Database["public"]["Enums"]["observation_status"]
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          current_value?: string | null
+          field_path?: string
+          id?: string
+          merchant_id?: string
+          observed_at?: string
+          observed_value?: string | null
+          source_record_id?: string | null
+          status?: Database["public"]["Enums"]["observation_status"]
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "observations_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "observations_source_record_id_fkey"
+            columns: ["source_record_id"]
+            isOneToOne: false
+            referencedRelation: "source_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "observations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      offers: {
+        Row: {
+          created_at: string
+          description: string | null
+          discount_label: string | null
+          ends_at: string | null
+          id: string
+          merchant_id: string
+          starts_at: string | null
+          state: Database["public"]["Enums"]["publish_state"]
+          tenant_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          discount_label?: string | null
+          ends_at?: string | null
+          id?: string
+          merchant_id: string
+          starts_at?: string | null
+          state?: Database["public"]["Enums"]["publish_state"]
+          tenant_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          discount_label?: string | null
+          ends_at?: string | null
+          id?: string
+          merchant_id?: string
+          starts_at?: string | null
+          state?: Database["public"]["Enums"]["publish_state"]
+          tenant_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "offers_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "offers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_items: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          order_id: string
+          quantity: number
+          tenant_id: string
+          unit_price_cents: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          order_id: string
+          quantity?: number
+          tenant_id: string
+          unit_price_cents?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          order_id?: string
+          quantity?: number
+          tenant_id?: string
+          unit_price_cents?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          created_at: string
+          currency: string
+          customer_email: string | null
+          customer_name: string | null
+          id: string
+          merchant_id: string
+          placed_at: string
+          provider: string
+          reference: string
+          status: Database["public"]["Enums"]["order_status"]
+          tenant_id: string
+          total_cents: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          id?: string
+          merchant_id: string
+          placed_at?: string
+          provider?: string
+          reference: string
+          status?: Database["public"]["Enums"]["order_status"]
+          tenant_id: string
+          total_cents?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          id?: string
+          merchant_id?: string
+          placed_at?: string
+          provider?: string
+          reference?: string
+          status?: Database["public"]["Enums"]["order_status"]
+          tenant_id?: string
+          total_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          created_at: string
+          currency: string
+          description: string | null
+          id: string
+          merchant_id: string
+          name: string
+          price_cents: number | null
+          sku: string | null
+          state: Database["public"]["Enums"]["publish_state"]
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          merchant_id: string
+          name: string
+          price_cents?: number | null
+          sku?: string | null
+          state?: Database["public"]["Enums"]["publish_state"]
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          merchant_id?: string
+          name?: string
+          price_cents?: number | null
+          sku?: string | null
+          state?: Database["public"]["Enums"]["publish_state"]
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "products_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      services: {
+        Row: {
+          created_at: string
+          description: string | null
+          duration_minutes: number | null
+          id: string
+          merchant_id: string
+          name: string
+          price_cents: number | null
+          state: Database["public"]["Enums"]["publish_state"]
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          merchant_id: string
+          name: string
+          price_cents?: number | null
+          state?: Database["public"]["Enums"]["publish_state"]
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          duration_minutes?: number | null
+          id?: string
+          merchant_id?: string
+          name?: string
+          price_cents?: number | null
+          state?: Database["public"]["Enums"]["publish_state"]
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "services_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "services_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      source_connectors: {
+        Row: {
+          config: Json
+          created_at: string
+          id: string
+          last_synced_at: string | null
+          name: string
+          provider: string
+          status: Database["public"]["Enums"]["connector_status"]
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          name: string
+          provider: string
+          status?: Database["public"]["Enums"]["connector_status"]
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          id?: string
+          last_synced_at?: string | null
+          name?: string
+          provider?: string
+          status?: Database["public"]["Enums"]["connector_status"]
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_connectors_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      source_records: {
+        Row: {
+          connector_id: string
+          created_at: string
+          external_id: string | null
+          fetched_at: string
+          id: string
+          merchant_id: string | null
+          payload: Json
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          connector_id: string
+          created_at?: string
+          external_id?: string | null
+          fetched_at?: string
+          id?: string
+          merchant_id?: string | null
+          payload?: Json
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          connector_id?: string
+          created_at?: string
+          external_id?: string | null
+          fetched_at?: string
+          id?: string
+          merchant_id?: string | null
+          payload?: Json
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "source_records_connector_id_fkey"
+            columns: ["connector_id"]
+            isOneToOne: false
+            referencedRelation: "source_connectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_records_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "source_records_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          created_at: string
+          current_period_end: string | null
+          id: string
+          interval: string
+          merchant_id: string
+          plan: string
+          price_cents: number
+          provider: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          interval?: string
+          merchant_id: string
+          plan: string
+          price_cents?: number
+          provider?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          interval?: string
+          merchant_id?: string
+          plan?: string
+          price_cents?: number
+          provider?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenants: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      visibility_queries: {
+        Row: {
+          created_at: string
+          id: string
+          intent: string | null
+          merchant_id: string | null
+          prompt: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          intent?: string | null
+          merchant_id?: string | null
+          prompt: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          intent?: string | null
+          merchant_id?: string | null
+          prompt?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visibility_queries_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visibility_queries_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visibility_snapshots: {
+        Row: {
+          captured_at: string
+          citations: Json
+          created_at: string
+          engine: string
+          id: string
+          mentioned: boolean
+          merchant_id: string
+          provider: string
+          query_id: string | null
+          rank: number | null
+          score: number
+          sentiment: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          captured_at?: string
+          citations?: Json
+          created_at?: string
+          engine: string
+          id?: string
+          mentioned?: boolean
+          merchant_id: string
+          provider?: string
+          query_id?: string | null
+          rank?: number | null
+          score?: number
+          sentiment?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          captured_at?: string
+          citations?: Json
+          created_at?: string
+          engine?: string
+          id?: string
+          mentioned?: boolean
+          merchant_id?: string
+          provider?: string
+          query_id?: string | null
+          rank?: number | null
+          score?: number
+          sentiment?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visibility_snapshots_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visibility_snapshots_query_id_fkey"
+            columns: ["query_id"]
+            isOneToOne: false
+            referencedRelation: "visibility_queries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visibility_snapshots_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      website_pages: {
+        Row: {
+          body: string | null
+          created_at: string
+          id: string
+          meta_description: string | null
+          path: string
+          state: Database["public"]["Enums"]["publish_state"]
+          tenant_id: string
+          title: string
+          updated_at: string
+          website_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          meta_description?: string | null
+          path: string
+          state?: Database["public"]["Enums"]["publish_state"]
+          tenant_id: string
+          title: string
+          updated_at?: string
+          website_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          meta_description?: string | null
+          path?: string
+          state?: Database["public"]["Enums"]["publish_state"]
+          tenant_id?: string
+          title?: string
+          updated_at?: string
+          website_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "website_pages_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "website_pages_website_id_fkey"
+            columns: ["website_id"]
+            isOneToOne: false
+            referencedRelation: "websites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      websites: {
+        Row: {
+          created_at: string
+          domain: string
+          id: string
+          merchant_id: string
+          state: Database["public"]["Enums"]["publish_state"]
+          tenant_id: string
+          theme: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          domain: string
+          id?: string
+          merchant_id: string
+          state?: Database["public"]["Enums"]["publish_state"]
+          tenant_id: string
+          theme?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          domain?: string
+          id?: string
+          merchant_id?: string
+          state?: Database["public"]["Enums"]["publish_state"]
+          tenant_id?: string
+          theme?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "websites_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "websites_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_runs: {
+        Row: {
+          created_at: string
+          engine: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          input: Json
+          output: Json | null
+          started_at: string
+          status: Database["public"]["Enums"]["workflow_status"]
+          steps: Json
+          tenant_id: string
+          updated_at: string
+          workflow: string
+        }
+        Insert: {
+          created_at?: string
+          engine?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          input?: Json
+          output?: Json | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["workflow_status"]
+          steps?: Json
+          tenant_id: string
+          updated_at?: string
+          workflow: string
+        }
+        Update: {
+          created_at?: string
+          engine?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          input?: Json
+          output?: Json | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["workflow_status"]
+          steps?: Json
+          tenant_id?: string
+          updated_at?: string
+          workflow?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_runs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_tenant_role: {
+        Args: {
+          _roles: Database["public"]["Enums"]["tenant_role"][]
+          _tenant_id: string
+        }
+        Returns: boolean
+      }
+      is_tenant_member: { Args: { _tenant_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      connector_status: "not_configured" | "configured" | "syncing" | "error"
+      discovery_status: "new" | "reviewing" | "claimed" | "dismissed"
+      happening_kind:
+        | "event"
+        | "promotion"
+        | "announcement"
+        | "menu_change"
+        | "hours_change"
+      happening_status:
+        | "draft"
+        | "in_review"
+        | "approved"
+        | "published"
+        | "rejected"
+      merchant_status:
+        | "prospect"
+        | "onboarding"
+        | "active"
+        | "paused"
+        | "archived"
+      observation_status: "pending" | "accepted" | "rejected" | "superseded"
+      order_status: "pending" | "paid" | "fulfilled" | "cancelled" | "refunded"
+      publish_state: "draft" | "published" | "archived"
+      subscription_status: "trialing" | "active" | "past_due" | "cancelled"
+      tenant_role: "owner" | "admin" | "editor" | "viewer"
+      vertical:
+        | "restaurant"
+        | "home_service"
+        | "beauty"
+        | "pet_service"
+        | "automotive"
+        | "local_retail"
+        | "other"
+      workflow_status: "queued" | "running" | "succeeded" | "failed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +1603,45 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      connector_status: ["not_configured", "configured", "syncing", "error"],
+      discovery_status: ["new", "reviewing", "claimed", "dismissed"],
+      happening_kind: [
+        "event",
+        "promotion",
+        "announcement",
+        "menu_change",
+        "hours_change",
+      ],
+      happening_status: [
+        "draft",
+        "in_review",
+        "approved",
+        "published",
+        "rejected",
+      ],
+      merchant_status: [
+        "prospect",
+        "onboarding",
+        "active",
+        "paused",
+        "archived",
+      ],
+      observation_status: ["pending", "accepted", "rejected", "superseded"],
+      order_status: ["pending", "paid", "fulfilled", "cancelled", "refunded"],
+      publish_state: ["draft", "published", "archived"],
+      subscription_status: ["trialing", "active", "past_due", "cancelled"],
+      tenant_role: ["owner", "admin", "editor", "viewer"],
+      vertical: [
+        "restaurant",
+        "home_service",
+        "beauty",
+        "pet_service",
+        "automotive",
+        "local_retail",
+        "other",
+      ],
+      workflow_status: ["queued", "running", "succeeded", "failed"],
+    },
   },
 } as const
