@@ -10,10 +10,73 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
+      assets: {
+        Row: {
+          alt_text: string | null
+          byte_size: number | null
+          content_type: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          merchant_id: string | null
+          public_url: string | null
+          storage_key: string
+          storage_provider: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          alt_text?: string | null
+          byte_size?: number | null
+          content_type?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          merchant_id?: string | null
+          public_url?: string | null
+          storage_key: string
+          storage_provider?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          alt_text?: string | null
+          byte_size?: number | null
+          content_type?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          merchant_id?: string | null
+          public_url?: string | null
+          storage_key?: string
+          storage_provider?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assets_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assets_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_hours: {
         Row: {
           closes_at: string | null
@@ -155,14 +218,19 @@ export type Database = {
         Row: {
           city: string | null
           created_at: string
+          dedupe_key: string | null
+          evidence: Json
           id: string
+          job_id: string | null
           merchant_id: string | null
           name: string
+          observed_at: string
           payload: Json
           phone: string | null
           provider: string
           region: string | null
           score: number
+          signals: Json
           status: Database["public"]["Enums"]["discovery_status"]
           tenant_id: string
           updated_at: string
@@ -172,14 +240,19 @@ export type Database = {
         Insert: {
           city?: string | null
           created_at?: string
+          dedupe_key?: string | null
+          evidence?: Json
           id?: string
+          job_id?: string | null
           merchant_id?: string | null
           name: string
+          observed_at?: string
           payload?: Json
           phone?: string | null
           provider?: string
           region?: string | null
           score?: number
+          signals?: Json
           status?: Database["public"]["Enums"]["discovery_status"]
           tenant_id: string
           updated_at?: string
@@ -189,14 +262,19 @@ export type Database = {
         Update: {
           city?: string | null
           created_at?: string
+          dedupe_key?: string | null
+          evidence?: Json
           id?: string
+          job_id?: string | null
           merchant_id?: string | null
           name?: string
+          observed_at?: string
           payload?: Json
           phone?: string | null
           provider?: string
           region?: string | null
           score?: number
+          signals?: Json
           status?: Database["public"]["Enums"]["discovery_status"]
           tenant_id?: string
           updated_at?: string
@@ -204,6 +282,13 @@ export type Database = {
           website?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "discovery_candidates_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "discovery_jobs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "discovery_candidates_merchant_id_fkey"
             columns: ["merchant_id"]
@@ -213,6 +298,68 @@ export type Database = {
           },
           {
             foreignKeyName: "discovery_candidates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      discovery_jobs: {
+        Row: {
+          city: string | null
+          created_at: string
+          created_count: number
+          error: string | null
+          finished_at: string | null
+          found_count: number
+          id: string
+          provider: string
+          query: string
+          requested_by: string | null
+          started_at: string
+          status: Database["public"]["Enums"]["workflow_status"]
+          tenant_id: string
+          updated_at: string
+          vertical: Database["public"]["Enums"]["vertical"] | null
+        }
+        Insert: {
+          city?: string | null
+          created_at?: string
+          created_count?: number
+          error?: string | null
+          finished_at?: string | null
+          found_count?: number
+          id?: string
+          provider: string
+          query: string
+          requested_by?: string | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["workflow_status"]
+          tenant_id: string
+          updated_at?: string
+          vertical?: Database["public"]["Enums"]["vertical"] | null
+        }
+        Update: {
+          city?: string | null
+          created_at?: string
+          created_count?: number
+          error?: string | null
+          finished_at?: string | null
+          found_count?: number
+          id?: string
+          provider?: string
+          query?: string
+          requested_by?: string | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["workflow_status"]
+          tenant_id?: string
+          updated_at?: string
+          vertical?: Database["public"]["Enums"]["vertical"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discovery_jobs_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -312,51 +459,78 @@ export type Database = {
       happenings: {
         Row: {
           ai_confidence: number | null
+          ai_model: string | null
+          ai_provider: string | null
           body: string | null
           created_at: string
           ends_at: string | null
+          evidence_excerpt: string | null
           id: string
+          image_url: string | null
           kind: Database["public"]["Enums"]["happening_kind"]
           merchant_id: string
+          origin: string
           published_at: string | null
+          source_kind: string | null
+          source_observed_at: string | null
           source_record_id: string | null
+          source_url: string | null
           starts_at: string | null
           status: Database["public"]["Enums"]["happening_status"]
           tenant_id: string
           title: string
           updated_at: string
+          verified: boolean
         }
         Insert: {
           ai_confidence?: number | null
+          ai_model?: string | null
+          ai_provider?: string | null
           body?: string | null
           created_at?: string
           ends_at?: string | null
+          evidence_excerpt?: string | null
           id?: string
+          image_url?: string | null
           kind?: Database["public"]["Enums"]["happening_kind"]
           merchant_id: string
+          origin?: string
           published_at?: string | null
+          source_kind?: string | null
+          source_observed_at?: string | null
           source_record_id?: string | null
+          source_url?: string | null
           starts_at?: string | null
           status?: Database["public"]["Enums"]["happening_status"]
           tenant_id: string
           title: string
           updated_at?: string
+          verified?: boolean
         }
         Update: {
           ai_confidence?: number | null
+          ai_model?: string | null
+          ai_provider?: string | null
           body?: string | null
           created_at?: string
           ends_at?: string | null
+          evidence_excerpt?: string | null
           id?: string
+          image_url?: string | null
           kind?: Database["public"]["Enums"]["happening_kind"]
           merchant_id?: string
+          origin?: string
           published_at?: string | null
+          source_kind?: string | null
+          source_observed_at?: string | null
           source_record_id?: string | null
+          source_url?: string | null
           starts_at?: string | null
           status?: Database["public"]["Enums"]["happening_status"]
           tenant_id?: string
           title?: string
           updated_at?: string
+          verified?: boolean
         }
         Relationships: [
           {
@@ -773,45 +947,69 @@ export type Database = {
       }
       orders: {
         Row: {
+          commission_bps: number
+          commission_cents: number
           created_at: string
           currency: string
           customer_email: string | null
           customer_name: string | null
+          dispute_status: string | null
           id: string
+          idempotency_key: string | null
           merchant_id: string
+          mode: string
+          payout_reference: string | null
           placed_at: string
           provider: string
+          provider_reference: string | null
           reference: string
+          refunded_cents: number
           status: Database["public"]["Enums"]["order_status"]
           tenant_id: string
           total_cents: number
           updated_at: string
         }
         Insert: {
+          commission_bps?: number
+          commission_cents?: number
           created_at?: string
           currency?: string
           customer_email?: string | null
           customer_name?: string | null
+          dispute_status?: string | null
           id?: string
+          idempotency_key?: string | null
           merchant_id: string
+          mode?: string
+          payout_reference?: string | null
           placed_at?: string
           provider?: string
+          provider_reference?: string | null
           reference: string
+          refunded_cents?: number
           status?: Database["public"]["Enums"]["order_status"]
           tenant_id: string
           total_cents?: number
           updated_at?: string
         }
         Update: {
+          commission_bps?: number
+          commission_cents?: number
           created_at?: string
           currency?: string
           customer_email?: string | null
           customer_name?: string | null
+          dispute_status?: string | null
           id?: string
+          idempotency_key?: string | null
           merchant_id?: string
+          mode?: string
+          payout_reference?: string | null
           placed_at?: string
           provider?: string
+          provider_reference?: string | null
           reference?: string
+          refunded_cents?: number
           status?: Database["public"]["Enums"]["order_status"]
           tenant_id?: string
           total_cents?: number
@@ -1073,6 +1271,7 @@ export type Database = {
       }
       subscriptions: {
         Row: {
+          cancelled_at: string | null
           created_at: string
           current_period_end: string | null
           id: string
@@ -1081,11 +1280,15 @@ export type Database = {
           plan: string
           price_cents: number
           provider: string
+          provider_reference: string | null
+          reconciled_at: string | null
           status: Database["public"]["Enums"]["subscription_status"]
           tenant_id: string
+          trial_ends_at: string | null
           updated_at: string
         }
         Insert: {
+          cancelled_at?: string | null
           created_at?: string
           current_period_end?: string | null
           id?: string
@@ -1094,11 +1297,15 @@ export type Database = {
           plan: string
           price_cents?: number
           provider?: string
+          provider_reference?: string | null
+          reconciled_at?: string | null
           status?: Database["public"]["Enums"]["subscription_status"]
           tenant_id: string
+          trial_ends_at?: string | null
           updated_at?: string
         }
         Update: {
+          cancelled_at?: string | null
           created_at?: string
           current_period_end?: string | null
           id?: string
@@ -1107,8 +1314,11 @@ export type Database = {
           plan?: string
           price_cents?: number
           provider?: string
+          provider_reference?: string | null
+          reconciled_at?: string | null
           status?: Database["public"]["Enums"]["subscription_status"]
           tenant_id?: string
+          trial_ends_at?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1151,6 +1361,70 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      value_signals: {
+        Row: {
+          candidate_id: string | null
+          confidence: number | null
+          created_at: string
+          decided_at: string
+          id: string
+          merchant_id: string | null
+          payload: Json
+          signal: string
+          stage: string
+          tenant_id: string
+          value_cents: number | null
+        }
+        Insert: {
+          candidate_id?: string | null
+          confidence?: number | null
+          created_at?: string
+          decided_at?: string
+          id?: string
+          merchant_id?: string | null
+          payload?: Json
+          signal: string
+          stage: string
+          tenant_id: string
+          value_cents?: number | null
+        }
+        Update: {
+          candidate_id?: string | null
+          confidence?: number | null
+          created_at?: string
+          decided_at?: string
+          id?: string
+          merchant_id?: string | null
+          payload?: Json
+          signal?: string
+          stage?: string
+          tenant_id?: string
+          value_cents?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "value_signals_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "discovery_candidates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "value_signals_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "value_signals_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       visibility_queries: {
         Row: {
@@ -1197,50 +1471,158 @@ export type Database = {
           },
         ]
       }
+      visibility_runs: {
+        Row: {
+          cost_usd: number | null
+          created_at: string
+          engines: Json
+          error: string | null
+          external_id: string | null
+          finished_at: string | null
+          id: string
+          idempotency_key: string | null
+          merchant_id: string
+          metrics: Json
+          mode: string
+          provider: string
+          raw: Json | null
+          requested_by: string | null
+          started_at: string
+          status: Database["public"]["Enums"]["workflow_status"]
+          system_version: string | null
+          tenant_id: string
+          updated_at: string
+          warnings: Json
+        }
+        Insert: {
+          cost_usd?: number | null
+          created_at?: string
+          engines?: Json
+          error?: string | null
+          external_id?: string | null
+          finished_at?: string | null
+          id?: string
+          idempotency_key?: string | null
+          merchant_id: string
+          metrics?: Json
+          mode?: string
+          provider: string
+          raw?: Json | null
+          requested_by?: string | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["workflow_status"]
+          system_version?: string | null
+          tenant_id: string
+          updated_at?: string
+          warnings?: Json
+        }
+        Update: {
+          cost_usd?: number | null
+          created_at?: string
+          engines?: Json
+          error?: string | null
+          external_id?: string | null
+          finished_at?: string | null
+          id?: string
+          idempotency_key?: string | null
+          merchant_id?: string
+          metrics?: Json
+          mode?: string
+          provider?: string
+          raw?: Json | null
+          requested_by?: string | null
+          started_at?: string
+          status?: Database["public"]["Enums"]["workflow_status"]
+          system_version?: string | null
+          tenant_id?: string
+          updated_at?: string
+          warnings?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visibility_runs_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visibility_runs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       visibility_snapshots: {
         Row: {
+          answer_excerpt: string | null
           captured_at: string
           citations: Json
+          cost_usd: number | null
           created_at: string
           engine: string
+          factual_accuracy: number | null
           id: string
           mentioned: boolean
+          mentioned_entities: Json
           merchant_id: string
+          model: string | null
           provider: string
           query_id: string | null
           rank: number | null
+          raw: Json | null
+          recommended: boolean
+          run_id: string | null
           score: number
           sentiment: string | null
           tenant_id: string
           updated_at: string
         }
         Insert: {
+          answer_excerpt?: string | null
           captured_at?: string
           citations?: Json
+          cost_usd?: number | null
           created_at?: string
           engine: string
+          factual_accuracy?: number | null
           id?: string
           mentioned?: boolean
+          mentioned_entities?: Json
           merchant_id: string
+          model?: string | null
           provider?: string
           query_id?: string | null
           rank?: number | null
+          raw?: Json | null
+          recommended?: boolean
+          run_id?: string | null
           score?: number
           sentiment?: string | null
           tenant_id: string
           updated_at?: string
         }
         Update: {
+          answer_excerpt?: string | null
           captured_at?: string
           citations?: Json
+          cost_usd?: number | null
           created_at?: string
           engine?: string
+          factual_accuracy?: number | null
           id?: string
           mentioned?: boolean
+          mentioned_entities?: Json
           merchant_id?: string
+          model?: string | null
           provider?: string
           query_id?: string | null
           rank?: number | null
+          raw?: Json | null
+          recommended?: boolean
+          run_id?: string | null
           score?: number
           sentiment?: string | null
           tenant_id?: string
@@ -1262,7 +1644,121 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "visibility_snapshots_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "visibility_runs"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "visibility_snapshots_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_events: {
+        Row: {
+          error: string | null
+          event_type: string | null
+          external_id: string
+          id: string
+          payload: Json
+          processed_at: string | null
+          provider: string
+          received_at: string
+          status: string
+          tenant_id: string | null
+        }
+        Insert: {
+          error?: string | null
+          event_type?: string | null
+          external_id: string
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          provider: string
+          received_at?: string
+          status?: string
+          tenant_id?: string | null
+        }
+        Update: {
+          error?: string | null
+          event_type?: string | null
+          external_id?: string
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          provider?: string
+          received_at?: string
+          status?: string
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      website_page_versions: {
+        Row: {
+          blocks: Json
+          body: string | null
+          created_at: string
+          created_by: string | null
+          generated: boolean
+          id: string
+          meta_description: string | null
+          page_id: string
+          seo_title: string | null
+          tenant_id: string
+          title: string
+          version: number
+        }
+        Insert: {
+          blocks?: Json
+          body?: string | null
+          created_at?: string
+          created_by?: string | null
+          generated?: boolean
+          id?: string
+          meta_description?: string | null
+          page_id: string
+          seo_title?: string | null
+          tenant_id: string
+          title: string
+          version: number
+        }
+        Update: {
+          blocks?: Json
+          body?: string | null
+          created_at?: string
+          created_by?: string | null
+          generated?: boolean
+          id?: string
+          meta_description?: string | null
+          page_id?: string
+          seo_title?: string | null
+          tenant_id?: string
+          title?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "website_page_versions_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "website_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "website_page_versions_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -1272,42 +1768,76 @@ export type Database = {
       }
       website_pages: {
         Row: {
+          blocks: Json
           body: string | null
           created_at: string
+          generated: boolean
           id: string
+          kind: string
+          locked: boolean
+          merchant_id: string | null
           meta_description: string | null
           path: string
+          published_at: string | null
+          seo_title: string | null
+          sort_order: number
           state: Database["public"]["Enums"]["publish_state"]
           tenant_id: string
           title: string
           updated_at: string
+          version: number
           website_id: string
         }
         Insert: {
+          blocks?: Json
           body?: string | null
           created_at?: string
+          generated?: boolean
           id?: string
+          kind?: string
+          locked?: boolean
+          merchant_id?: string | null
           meta_description?: string | null
           path: string
+          published_at?: string | null
+          seo_title?: string | null
+          sort_order?: number
           state?: Database["public"]["Enums"]["publish_state"]
           tenant_id: string
           title: string
           updated_at?: string
+          version?: number
           website_id: string
         }
         Update: {
+          blocks?: Json
           body?: string | null
           created_at?: string
+          generated?: boolean
           id?: string
+          kind?: string
+          locked?: boolean
+          merchant_id?: string | null
           meta_description?: string | null
           path?: string
+          published_at?: string | null
+          seo_title?: string | null
+          sort_order?: number
           state?: Database["public"]["Enums"]["publish_state"]
           tenant_id?: string
           title?: string
           updated_at?: string
+          version?: number
           website_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "website_pages_merchant_id_fkey"
+            columns: ["merchant_id"]
+            isOneToOne: false
+            referencedRelation: "merchants"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "website_pages_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -1329,7 +1859,14 @@ export type Database = {
           created_at: string
           domain: string
           id: string
+          last_generated_at: string | null
           merchant_id: string
+          nav: Json
+          published_at: string | null
+          published_version: number
+          seo_description: string | null
+          seo_title: string | null
+          slug: string | null
           state: Database["public"]["Enums"]["publish_state"]
           tenant_id: string
           theme: string
@@ -1339,7 +1876,14 @@ export type Database = {
           created_at?: string
           domain: string
           id?: string
+          last_generated_at?: string | null
           merchant_id: string
+          nav?: Json
+          published_at?: string | null
+          published_version?: number
+          seo_description?: string | null
+          seo_title?: string | null
+          slug?: string | null
           state?: Database["public"]["Enums"]["publish_state"]
           tenant_id: string
           theme?: string
@@ -1349,7 +1893,14 @@ export type Database = {
           created_at?: string
           domain?: string
           id?: string
+          last_generated_at?: string | null
           merchant_id?: string
+          nav?: Json
+          published_at?: string | null
+          published_version?: number
+          seo_description?: string | null
+          seo_title?: string | null
+          slug?: string | null
           state?: Database["public"]["Enums"]["publish_state"]
           tenant_id?: string
           theme?: string
@@ -1492,12 +2043,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1521,11 +2072,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1546,11 +2097,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1571,11 +2122,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1588,11 +2139,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
