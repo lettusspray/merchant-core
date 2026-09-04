@@ -58,8 +58,9 @@ export async function recordEvent(
 }
 
 export async function dashboardSnapshot(supabase: Db, tenantId: string) {
-  const scoped = <T extends keyof Database["public"]["Tables"]>(table: T) =>
+  const scoped = (table: "merchants" | "discovery_candidates") =>
     supabase.from(table).select("*", { count: "exact", head: true }).eq("tenant_id", tenantId);
+
 
   const [merchants, active, prospects, pendingContent, pendingObs, orders, subs] = await Promise.all([
     scoped("merchants"),
