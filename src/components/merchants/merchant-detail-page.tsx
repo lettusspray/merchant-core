@@ -18,6 +18,8 @@ import {
 import type { ComponentType, ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { EditIdentityDialog } from "@/components/merchants/edit-identity-dialog";
+
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
