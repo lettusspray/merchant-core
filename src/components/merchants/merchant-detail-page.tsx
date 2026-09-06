@@ -18,6 +18,7 @@ import {
 import type { ComponentType, ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
+import { EditIdentityDialog } from "@/components/merchants/edit-identity-dialog";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -133,8 +134,9 @@ function InfoRow({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function OverviewTab({ detail }: { detail: Detail }) {
+function OverviewTab({ detail, onSaved }: { detail: Detail; onSaved: () => void | Promise<void> }) {
   const { merchant } = detail;
+  const [saved, setSaved] = useState(false);
   const categories = merchant.categories as
     { name: string }[] | { name: string } | null | undefined;
   const categoryName = Array.isArray(categories) ? categories[0]?.name : categories?.name;
@@ -156,9 +158,25 @@ function OverviewTab({ detail }: { detail: Detail }) {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Identity</CardTitle>
+        <CardHeader className="flex-row items-center justify-between gap-3 pb-2">
+          <div className="space-y-1">
+            <CardTitle className="text-base">Identity</CardTitle>
+            {saved ? (
+              <p className="text-xs font-medium text-muted-foreground">
+                Identity saved and recorded in the event log.
+              </p>
+            ) : null}
+          </div>
+          <EditIdentityDialog
+            merchant={merchant}
+            categories={detail.categoryOptions ?? []}
+            onSaved={async () => {
+              await onSaved();
+              setSaved(true);
+            }}
+          />
         </CardHeader>
+
         <CardContent>
           <dl className="divide-y">
             <InfoRow label="Name" value={merchant.name} />
@@ -875,22 +893,29 @@ export function MerchantDetailPage({ merchantId }: { merchantId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
 
-  const load = useCallback(async () => {
-    setError(null);
-    setNotFound(false);
-    setDetail(null);
-    try {
-      const result = await merchantDetailFn({ data: { merchantId } });
-      setDetail(result);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Could not load merchant.";
-      if (message.toLowerCase().includes("not found")) {
-        setNotFound(true);
-      } else {
-        setError(message);
+  const load = useCallback(
+    async (mode: "initial" | "refresh" = "initial") => {
+      setError(null);
+      setNotFound(false);
+      if (mode === "initial") setDetail(null);
+      try {
+        const result = await merchantDetailFn({ data: { merchantId } });
+        setDetail(result);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Could not load merchant.";
+        if (message.toLowerCase().includes("not found")) {
+          setNotFound(true);
+        } else {
+          setError(message);
+        }
       }
-    }
-  }, [merchantId]);
+    },
+    [merchantId],
+  );
+
+  const refresh = useCallback(async () => {
+    await load("refresh");
+  }, [load]);
 
   useEffect(() => {
     if (session.status === "signed-in") {
@@ -930,7 +955,7 @@ export function MerchantDetailPage({ merchantId }: { merchantId: string }) {
             </TabsList>
           </div>
           <TabsContent value="overview" className="mt-4">
-            <OverviewTab detail={detail} />
+            <OverviewTab detail={detail} onSaved={refresh} />
           </TabsContent>
           <TabsContent value="locations" className="mt-4">
             <LocationsTab detail={detail} />
