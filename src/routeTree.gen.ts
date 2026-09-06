@@ -10,33 +10,128 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CommerceRouteImport } from './routes/commerce'
+import { Route as DiscoveryRouteImport } from './routes/discovery'
+import { Route as HappeningsRouteImport } from './routes/happenings'
+import { Route as MerchantsRouteImport } from './routes/merchants'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SystemRouteImport } from './routes/system'
+import { Route as VisibilityRouteImport } from './routes/visibility'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CommerceRoute = CommerceRouteImport.update({
+  id: '/commerce',
+  path: '/commerce',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DiscoveryRoute = DiscoveryRouteImport.update({
+  id: '/discovery',
+  path: '/discovery',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HappeningsRoute = HappeningsRouteImport.update({
+  id: '/happenings',
+  path: '/happenings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MerchantsRoute = MerchantsRouteImport.update({
+  id: '/merchants',
+  path: '/merchants',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SystemRoute = SystemRouteImport.update({
+  id: '/system',
+  path: '/system',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VisibilityRoute = VisibilityRouteImport.update({
+  id: '/visibility',
+  path: '/visibility',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/commerce': typeof CommerceRoute
+  '/discovery': typeof DiscoveryRoute
+  '/happenings': typeof HappeningsRoute
+  '/merchants': typeof MerchantsRoute
+  '/settings': typeof SettingsRoute
+  '/system': typeof SystemRoute
+  '/visibility': typeof VisibilityRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/commerce': typeof CommerceRoute
+  '/discovery': typeof DiscoveryRoute
+  '/happenings': typeof HappeningsRoute
+  '/merchants': typeof MerchantsRoute
+  '/settings': typeof SettingsRoute
+  '/system': typeof SystemRoute
+  '/visibility': typeof VisibilityRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/commerce': typeof CommerceRoute
+  '/discovery': typeof DiscoveryRoute
+  '/happenings': typeof HappeningsRoute
+  '/merchants': typeof MerchantsRoute
+  '/settings': typeof SettingsRoute
+  '/system': typeof SystemRoute
+  '/visibility': typeof VisibilityRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/commerce'
+    | '/discovery'
+    | '/happenings'
+    | '/merchants'
+    | '/settings'
+    | '/system'
+    | '/visibility'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/commerce'
+    | '/discovery'
+    | '/happenings'
+    | '/merchants'
+    | '/settings'
+    | '/system'
+    | '/visibility'
+  id:
+    | '__root__'
+    | '/'
+    | '/commerce'
+    | '/discovery'
+    | '/happenings'
+    | '/merchants'
+    | '/settings'
+    | '/system'
+    | '/visibility'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CommerceRoute: typeof CommerceRoute
+  DiscoveryRoute: typeof DiscoveryRoute
+  HappeningsRoute: typeof HappeningsRoute
+  MerchantsRoute: typeof MerchantsRoute
+  SettingsRoute: typeof SettingsRoute
+  SystemRoute: typeof SystemRoute
+  VisibilityRoute: typeof VisibilityRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +143,67 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/commerce': {
+      id: '/commerce'
+      path: '/commerce'
+      fullPath: '/commerce'
+      preLoaderRoute: typeof CommerceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/discovery': {
+      id: '/discovery'
+      path: '/discovery'
+      fullPath: '/discovery'
+      preLoaderRoute: typeof DiscoveryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/happenings': {
+      id: '/happenings'
+      path: '/happenings'
+      fullPath: '/happenings'
+      preLoaderRoute: typeof HappeningsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/merchants': {
+      id: '/merchants'
+      path: '/merchants'
+      fullPath: '/merchants'
+      preLoaderRoute: typeof MerchantsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/system': {
+      id: '/system'
+      path: '/system'
+      fullPath: '/system'
+      preLoaderRoute: typeof SystemRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/visibility': {
+      id: '/visibility'
+      path: '/visibility'
+      fullPath: '/visibility'
+      preLoaderRoute: typeof VisibilityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CommerceRoute: CommerceRoute,
+  DiscoveryRoute: DiscoveryRoute,
+  HappeningsRoute: HappeningsRoute,
+  MerchantsRoute: MerchantsRoute,
+  SettingsRoute: SettingsRoute,
+  SystemRoute: SystemRoute,
+  VisibilityRoute: VisibilityRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
