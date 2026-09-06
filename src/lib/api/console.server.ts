@@ -379,6 +379,79 @@ export async function merchantDetail(supabase: Db, tenantId: string, merchantId:
   };
 }
 
+export const MERCHANT_VERTICALS = [
+  "restaurant",
+  "home_service",
+  "beauty",
+  "pet_service",
+  "automotive",
+  "local_retail",
+  "other",
+] as const;
+
+export const MERCHANT_STATUSES = [
+  "prospect",
+  "onboarding",
+  "active",
+  "paused",
+  "archived",
+] as const;
+
+export type MerchantIdentityInput = {
+  name: string;
+  slug: string;
+  vertical: (typeof MERCHANT_VERTICALS)[number];
+  status: (typeof MERCHANT_STATUSES)[number];
+  tagline: string | null;
+  description: string | null;
+  brand_color: string | null;
+  logo_url: string | null;
+  primary_category_id: string | null;
+};
+
+export async function tenantCategories(supabase: Db, tenantId: string) {
+  const { data, error } = await supabase
+    .from("categories")
+    .select("id, name, vertical")
+    .eq("tenant_id", tenantId)
+    .order("name");
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** Updates the merchant's canonical identity fields. Tenant scope is enforced
+ *  server-side and again by RLS; the client never supplies a tenant id. */
+export async function updateMerchantIdentity(
+  supabase: Db,
+  tenantId: string,
+  merchantId: string,
+  input: MerchantIdentityInput,
+) {
+  const { data, error } = await supabase
+    .from("merchants")
+    .update({
+      name: input.name,
+      slug: input.slug,
+      vertical: input.vertical,
+      status: input.status,
+      tagline: input.tagline,
+      description: input.description,
+      brand_color: input.brand_color,
+      logo_url: input.logo_url,
+      primary_category_id: input.primary_category_id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("tenant_id", tenantId)
+    .eq("id", merchantId)
+    .select(
+      "id, name, slug, vertical, status, tagline, description, brand_color, logo_url, primary_category_id, updated_at",
+    )
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("Merchant not found");
+  return data;
+}
+
 function slugify(name: string): string {
   return name
     .toLowerCase()
@@ -386,6 +459,7 @@ function slugify(name: string): string {
     .replace(/^-|-$/g, "")
     .slice(0, 80);
 }
+
 
 export async function promoteCandidate(
   supabase: Db,
