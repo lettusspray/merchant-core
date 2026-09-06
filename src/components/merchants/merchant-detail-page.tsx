@@ -133,8 +133,9 @@ function InfoRow({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function OverviewTab({ detail }: { detail: Detail }) {
+function OverviewTab({ detail, onSaved }: { detail: Detail; onSaved: () => void | Promise<void> }) {
   const { merchant } = detail;
+  const [saved, setSaved] = useState(false);
   const categories = merchant.categories as
     { name: string }[] | { name: string } | null | undefined;
   const categoryName = Array.isArray(categories) ? categories[0]?.name : categories?.name;
@@ -156,9 +157,25 @@ function OverviewTab({ detail }: { detail: Detail }) {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Identity</CardTitle>
+        <CardHeader className="flex-row items-center justify-between gap-3 pb-2">
+          <div className="space-y-1">
+            <CardTitle className="text-base">Identity</CardTitle>
+            {saved ? (
+              <p className="text-xs font-medium text-muted-foreground">
+                Identity saved and recorded in the event log.
+              </p>
+            ) : null}
+          </div>
+          <EditIdentityDialog
+            merchant={merchant}
+            categories={detail.categoryOptions ?? []}
+            onSaved={async () => {
+              await onSaved();
+              setSaved(true);
+            }}
+          />
         </CardHeader>
+
         <CardContent>
           <dl className="divide-y">
             <InfoRow label="Name" value={merchant.name} />
