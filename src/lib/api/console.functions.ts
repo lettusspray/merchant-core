@@ -136,10 +136,33 @@ export const merchantDetailFn = createServerFn({ method: "GET" })
   .handler(async ({ context, data }) => {
     const supabase = context.supabase;
     const tenantId = await resolveTenant(supabase);
-    const detail = await merchantDetail(supabase, tenantId, data.merchantId);
+    const [detail, categoryOptions] = await Promise.all([
+      merchantDetail(supabase, tenantId, data.merchantId),
+      tenantCategories(supabase, tenantId),
+    ]);
 
-    return { ...detail };
+    return { ...detail, categoryOptions };
   });
+
+export const updateMerchantIdentityFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => merchantIdentitySchema.parse(input))
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    const { merchantId, ...fields } = data;
+    const merchant = await updateMerchantIdentity(supabase, tenantId, merchantId, fields);
+    await recordEvent(supabase, {
+      tenantId,
+      actorId: context.userId,
+      kind: "merchant.updated",
+      subjectType: "merchant",
+      subjectId: merchantId,
+      payload: { fields },
+    });
+    return { merchant };
+  });
+
 
 export const discoveryCandidatesFn = createServerFn({ method: "GET" })
   .validator((input: { q?: string; status?: string }) => input)
