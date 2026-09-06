@@ -460,7 +460,6 @@ function slugify(name: string): string {
     .slice(0, 80);
 }
 
-
 export async function promoteCandidate(
   supabase: Db,
   tenantId: string,

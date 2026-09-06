@@ -20,7 +20,6 @@ import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { EditIdentityDialog } from "@/components/merchants/edit-identity-dialog";
 
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -917,7 +916,6 @@ export function MerchantDetailPage({ merchantId }: { merchantId: string }) {
   const refresh = useCallback(async () => {
     await load("refresh");
   }, [load]);
-
 
   useEffect(() => {
     if (session.status === "signed-in") {

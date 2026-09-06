@@ -76,7 +76,6 @@ const merchantIdentitySchema = z.object({
 
 export type MerchantIdentityFormInput = z.input<typeof merchantIdentitySchema>;
 
-
 export const consoleOverviewFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -162,7 +161,6 @@ export const updateMerchantIdentityFn = createServerFn({ method: "POST" })
     });
     return { merchant };
   });
-
 
 export const discoveryCandidatesFn = createServerFn({ method: "GET" })
   .validator((input: { q?: string; status?: string }) => input)
