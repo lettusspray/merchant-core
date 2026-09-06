@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { format } from "date-fns";
 import {
+  ArrowLeft,
   CalendarDays,
   FileText,
   Globe,
@@ -897,7 +898,7 @@ export function MerchantDetailPage({ merchantId }: { merchantId: string }) {
     }
   }, [session.status, load]);
 
-  const title = detail && !notFound && !error ? detail.merchant.name : "Merchant";
+  const title = notFound ? "Not found" : detail && !error ? detail.merchant.name : "Merchant";
 
   let content: ReactNode;
 
@@ -966,7 +967,16 @@ export function MerchantDetailPage({ merchantId }: { merchantId: string }) {
 
   return (
     <AppShell title={title}>
-      <div className="space-y-6">{content}</div>
+      <div className="space-y-6">
+        <Link
+          to="/merchants"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" />
+          Merchants
+        </Link>
+        {content}
+      </div>
     </AppShell>
   );
 }

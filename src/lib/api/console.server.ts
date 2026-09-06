@@ -61,34 +61,42 @@ export async function dashboardSnapshot(supabase: Db, tenantId: string) {
   const scoped = (table: "merchants" | "discovery_candidates") =>
     supabase.from(table).select("*", { count: "exact", head: true }).eq("tenant_id", tenantId);
 
+  const [merchants, active, prospects, pendingContent, pendingObs, orders, subs] =
+    await Promise.all([
+      scoped("merchants"),
+      supabase
+        .from("merchants")
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .eq("status", "active"),
+      scoped("discovery_candidates"),
+      supabase
+        .from("happenings")
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .in("status", ["draft", "in_review"]),
+      supabase
+        .from("observations")
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .eq("status", "pending"),
+      supabase.from("orders").select("total_cents, status").eq("tenant_id", tenantId),
+      supabase
+        .from("subscriptions")
+        .select("price_cents, status, interval")
+        .eq("tenant_id", tenantId),
+    ]);
 
-  const [merchants, active, prospects, pendingContent, pendingObs, orders, subs] = await Promise.all([
-    scoped("merchants"),
-    supabase
-      .from("merchants")
-      .select("*", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .eq("status", "active"),
-    scoped("discovery_candidates"),
-    supabase
-      .from("happenings")
-      .select("*", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .in("status", ["draft", "in_review"]),
-    supabase
-      .from("observations")
-      .select("*", { count: "exact", head: true })
-      .eq("tenant_id", tenantId)
-      .eq("status", "pending"),
-    supabase.from("orders").select("total_cents, status").eq("tenant_id", tenantId),
-    supabase.from("subscriptions").select("price_cents, status, interval").eq("tenant_id", tenantId),
-  ]);
-
-  const paidOrders = (orders.data ?? []).filter((o) => o.status !== "cancelled" && o.status !== "refunded");
+  const paidOrders = (orders.data ?? []).filter(
+    (o) => o.status !== "cancelled" && o.status !== "refunded",
+  );
   const gmvCents = paidOrders.reduce((sum, o) => sum + o.total_cents, 0);
   const mrrCents = (subs.data ?? [])
     .filter((s) => s.status === "active" || s.status === "trialing")
-    .reduce((sum, s) => sum + (s.interval === "year" ? Math.round(s.price_cents / 12) : s.price_cents), 0);
+    .reduce(
+      (sum, s) => sum + (s.interval === "year" ? Math.round(s.price_cents / 12) : s.price_cents),
+      0,
+    );
 
   const [visibility, recentEvents, workflows] = await Promise.all([
     supabase
@@ -137,12 +145,31 @@ export async function merchantList(
 ) {
   let query = supabase
     .from("merchants")
-    .select("id, name, slug, vertical, status, tagline, data_quality, updated_at, locations(city, region, is_primary)")
+    .select(
+      "id, name, slug, vertical, status, tagline, data_quality, updated_at, locations(city, region, is_primary)",
+    )
     .eq("tenant_id", tenantId)
     .order("name");
   if (filters.search) query = query.ilike("name", `%${filters.search}%`);
   if (filters.vertical) query = query.eq("vertical", filters.vertical as never);
   if (filters.status) query = query.eq("status", filters.status as never);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function discoveryCandidates(
+  supabase: Db,
+  tenantId: string,
+  filters: { search?: string },
+) {
+  let query = supabase
+    .from("discovery_candidates")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .order("score", { ascending: false })
+    .order("updated_at", { ascending: false });
+  if (filters.search) query = query.ilike("name", `%${filters.search}%`);
   const { data, error } = await query;
   if (error) throw error;
   return data ?? [];
@@ -184,13 +211,20 @@ export async function merchantDetail(supabase: Db, tenantId: string, merchantId:
       .match(eq)
       .order("observed_at", { ascending: false }),
     supabase.from("happenings").select("*").match(eq).order("created_at", { ascending: false }),
-    supabase.from("websites").select("*, website_pages(id, path, title, state, meta_description, updated_at)").match(eq),
+    supabase
+      .from("websites")
+      .select("*, website_pages(id, path, title, state, meta_description, updated_at)")
+      .match(eq),
     supabase
       .from("visibility_snapshots")
       .select("*, visibility_queries(prompt, intent)")
       .match(eq)
       .order("captured_at", { ascending: false }),
-    supabase.from("orders").select("*, order_items(*)").match(eq).order("placed_at", { ascending: false }),
+    supabase
+      .from("orders")
+      .select("*, order_items(*)")
+      .match(eq)
+      .order("placed_at", { ascending: false }),
     supabase.from("subscriptions").select("*").match(eq).maybeSingle(),
     supabase
       .from("events")

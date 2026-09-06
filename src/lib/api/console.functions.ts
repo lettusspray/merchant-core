@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   dashboardSnapshot,
+  discoveryCandidates,
   listWorkspaces,
   merchantDetail,
   merchantList,
@@ -71,4 +72,17 @@ export const merchantDetailFn = createServerFn({ method: "GET" })
     const detail = await merchantDetail(supabase, tenantId, data.merchantId);
 
     return { ...detail };
+  });
+
+export const discoveryCandidatesFn = createServerFn({ method: "GET" })
+  .validator((input: { q?: string }) => input)
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    const filters: { search?: string } = {};
+    if (data.q?.trim()) filters.search = data.q.trim();
+    const candidates = await discoveryCandidates(supabase, tenantId, filters);
+
+    return { candidates };
   });
