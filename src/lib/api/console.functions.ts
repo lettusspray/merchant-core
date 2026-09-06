@@ -18,6 +18,7 @@ import {
   PUBLISH_STATES,
   recordEvent,
   resolveTenant,
+  runDiscovery,
   runMockVisibility,
   systemActivity,
   tenantCategories,
@@ -91,6 +92,12 @@ const locationSchema = z.object({
   country: optionalText(80),
   phone: optionalText(40),
   is_primary: z.boolean(),
+});
+
+const runDiscoverySchema = z.object({
+  query: z.string().trim().max(120).optional(),
+  city: z.string().trim().max(120).optional(),
+  vertical: z.string().trim().max(40).optional(),
 });
 
 const catalogItemSchema = z.discriminatedUnion("kind", [
@@ -431,5 +438,39 @@ export const runMockVisibilityFn = createServerFn({ method: "POST" })
       subjectId: result.runId,
       payload: { mode: result.mode, merchantId: data.merchantId },
     });
+    return { result };
+  });
+
+export const runDiscoveryFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => runDiscoverySchema.parse(input))
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    const result = await runDiscovery(supabase, tenantId, context.userId, {
+      ...(data.query ? { query: data.query } : {}),
+      ...(data.city ? { city: data.city } : {}),
+      ...(data.vertical ? { vertical: data.vertical } : {}),
+    });
+    await recordEvent(supabase, {
+      tenantId,
+      actorId: context.userId,
+      kind: result.status === "failed" ? "discovery.run_failed" : "discovery.run_completed",
+      subjectType: "discovery_job",
+      subjectId: result.jobId,
+      payload: {
+        provider: result.provider,
+        query: result.query,
+        vertical: result.vertical ?? undefined,
+        city: result.city ?? undefined,
+        found: result.foundCount,
+        created: result.createdCount,
+        updated: result.updatedCount,
+        error: result.error ?? undefined,
+      },
+    });
+    if (result.status === "failed") {
+      throw new Error(result.error ?? "Discovery run failed.");
+    }
     return { result };
   });

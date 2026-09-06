@@ -8,6 +8,8 @@ import {
   Globe,
   MapPin,
   Phone,
+  Play,
+  RefreshCw,
   Search,
   TriangleAlert,
 } from "lucide-react";
@@ -34,7 +36,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useSessionState } from "@/hooks/use-session-state";
-import { discoveryCandidatesFn, promoteCandidateFn } from "@/lib/api/console.functions";
+import {
+  discoveryCandidatesFn,
+  promoteCandidateFn,
+  runDiscoveryFn,
+} from "@/lib/api/console.functions";
 
 type DiscoveryPayload = Awaited<ReturnType<typeof discoveryCandidatesFn>>;
 type Candidate = DiscoveryPayload["candidates"][number];
@@ -338,6 +344,26 @@ export function DiscoveryPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+  const [runNotice, setRunNotice] = useState<string | null>(null);
+
+  const handleRunDiscovery = async () => {
+    if (running) return;
+    setRunning(true);
+    setRunNotice(null);
+    try {
+      const { result } = await runDiscoveryFn({ data: {} });
+      setRunNotice(
+        `Run complete: ${result.foundCount} found · ${result.createdCount} created · ${result.updatedCount} updated (mock).`,
+      );
+      await load();
+    } catch (err) {
+      setRunNotice(`Run failed: ${err instanceof Error ? err.message : "Discovery run failed."}`);
+      await load();
+    } finally {
+      setRunning(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -406,6 +432,39 @@ export function DiscoveryPage() {
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-medium">Mock discovery source</p>
+          <p className="text-xs text-muted-foreground">
+            Runs generate local-business prospects from a local mock registry and refresh them on
+            follow-up runs. Promotion to a merchant stays manual.
+          </p>
+        </div>
+        <Button onClick={handleRunDiscovery} disabled={running} className="sm:w-auto">
+          {running ? (
+            <>
+              <RefreshCw className="size-4 animate-spin" />
+              Running…
+            </>
+          ) : (
+            <>
+              <Play className="size-4" />
+              Run discovery
+            </>
+          )}
+        </Button>
+      </div>
+      {runNotice ? (
+        <div
+          className={`rounded-md border p-2.5 text-xs ${
+            runNotice.startsWith("Run failed")
+              ? "border-destructive/40 bg-destructive/5 text-destructive"
+              : "border-border bg-muted/50 text-muted-foreground"
+          }`}
+        >
+          {runNotice}
+        </div>
+      ) : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1 sm:max-w-xs">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

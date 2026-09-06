@@ -856,3 +856,318 @@ export async function runMockVisibility(
 
   return { runId: run.id, mode: runResult.mode, snapshots: snapshots.length };
 }
+
+export const MOCK_DISCOVERY_SOURCE = "mock_discovery";
+
+export type RunDiscoveryInput = {
+  query?: string;
+  city?: string;
+  vertical?: string;
+};
+
+export type RunDiscoveryResult = {
+  status: "succeeded" | "failed";
+  jobId: string;
+  provider: string;
+  query: string;
+  vertical: string | null;
+  city: string | null;
+  foundCount: number;
+  createdCount: number;
+  updatedCount: number;
+  error: string | null;
+};
+
+const VERTICAL_DEMO_NAMES: Record<string, string[]> = {
+  restaurant: [
+    "Harborline Grill",
+    "The Gilded Skillet",
+    "Marlow's Pasta Bar",
+    "Ember & Oak Kitchen",
+    "Saffron Street Eatery",
+    "Brine & Branch",
+  ],
+  home_service: [
+    "TrueNorth Plumbing",
+    "Brightline Electric",
+    "Pine & Copper Renovation",
+    "Summit Appliance Repair",
+    "Cedar Brook Heating",
+    "Crestpoint Roofing",
+  ],
+  beauty: [
+    "Lumen Beauty Bar",
+    "Copper Fox Salon",
+    "Pureform Skin Studio",
+    "Mirror & Muse Nails",
+    "Vela Hair Collective",
+    "Bloom & Tonic Spa",
+  ],
+  pet_service: [
+    "Wagstone Pet Co.",
+    "Pawprint Boarding",
+    "Fetch & Feather Grooming",
+    "Happy Tail Training",
+    "Velvet Pup Daycare",
+    "Treadwell Mobile Vet",
+  ],
+  automotive: [
+    "Monarch Auto Works",
+    "Redline Brake & Tire",
+    "Slate City Motors",
+    "Hardline Detailing",
+    "Cornerstone Lube",
+    "Ironworks Garage",
+  ],
+  local_retail: [
+    "Maple & Thread",
+    "Harbor Row Supply",
+    "Granite Street Market",
+    "Blue Door General",
+    "Pilion Books & Goods",
+    "Anchor & Grain",
+  ],
+  other: [
+    "Westfield Traders",
+    "Grandview Services",
+    "Fieldstone Studio",
+    "Ridgeline Supplies",
+    "Marlowe & Co.",
+    "Cedar Post Goods",
+  ],
+};
+
+const DEMO_VERTICALS = Object.keys(VERTICAL_DEMO_NAMES);
+const DEFAULT_QUERY = "local business";
+
+function hashString(input: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function seededRand(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Deterministic, vertical-aware mock candidates so re-runs refresh instead of duplicate. */
+function generateMockCandidates(input: RunDiscoveryInput): Array<{
+  name: string;
+  vertical: string;
+  city: string | null;
+  region: string | null;
+  phone: string;
+  website: string;
+  score: number;
+  dedupeKey: string;
+  signals: unknown[];
+  evidence: unknown[];
+  payload: Record<string, unknown>;
+}> {
+  const vertical = DEMO_VERTICALS.includes(input.vertical ?? "")
+    ? (input.vertical as string)
+    : "other";
+  const pool = VERTICAL_DEMO_NAMES[vertical] ?? VERTICAL_DEMO_NAMES["other"]!;
+  const rand = seededRand(
+    hashString(`${input.query ?? DEFAULT_QUERY}|${input.city ?? ""}|${vertical}`),
+  );
+
+  const order = [...pool];
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [order[i], order[j]] = [order[j]!, order[i]!];
+  }
+
+  const city = input.city?.trim() ? input.city.trim() : null;
+  const now = new Date().toISOString();
+
+  return order.slice(0, 5).map((name, index) => ({
+    name,
+    vertical,
+    city,
+    region: null,
+    phone: `+1-415-555-01${index}`,
+    website: `https://www.${slugify(name).replace(/-/g, "")}.demo`,
+    score: Math.round((0.55 + rand() * 0.45) * 100) / 100,
+    dedupeKey: `${MOCK_DISCOVERY_SOURCE}:${slugify(name)}`,
+    signals: [
+      { signal: "listings_provider", value: MOCK_DISCOVERY_SOURCE },
+      { signal: "source", value: "mock local directory" },
+      { signal: "recently_observed", value: true },
+    ],
+    evidence: [
+      {
+        source: MOCK_DISCOVERY_SOURCE,
+        note: "Generated from a mock discovery source for demos.",
+        observed_at: now,
+      },
+    ],
+    payload: {
+      source: MOCK_DISCOVERY_SOURCE,
+      mock: true,
+      provider_version: "1.0",
+    },
+  }));
+}
+
+/** Run a mock discovery pass: persist a job, transcribe results into candidates, dedupe by key. */
+export async function runDiscovery(
+  supabase: Db,
+  tenantId: string,
+  actorId: string,
+  input: RunDiscoveryInput,
+): Promise<RunDiscoveryResult> {
+  const query = input.query?.trim() ? input.query.trim() : DEFAULT_QUERY;
+  const vertical =
+    input.vertical && DEMO_VERTICALS.includes(input.vertical) ? input.vertical : null;
+  const city = input.city?.trim() ? input.city.trim() : null;
+
+  const { data: job, error: jobError } = await supabase
+    .from("discovery_jobs")
+    .insert({
+      tenant_id: tenantId,
+      provider: MOCK_DISCOVERY_SOURCE,
+      query,
+      vertical: (vertical as never) ?? null,
+      city,
+      status: "running",
+      requested_by: actorId,
+    })
+    .select("id")
+    .single();
+  if (jobError) throw jobError;
+
+  try {
+    const found = generateMockCandidates({
+      query,
+      ...(vertical ? { vertical } : {}),
+      ...(city ? { city } : {}),
+    });
+
+    const { data: existing, error: fetchError } = await supabase
+      .from("discovery_candidates")
+      .select("id, dedupe_key")
+      .eq("tenant_id", tenantId)
+      .in(
+        "dedupe_key",
+        found.map((c) => c.dedupeKey),
+      );
+    if (fetchError) throw fetchError;
+
+    const existingKeys = new Set(
+      (existing ?? []).flatMap((row) => (row.dedupe_key ? [row.dedupe_key] : [])),
+    );
+    const now = new Date().toISOString();
+
+    const fresh = found.filter((c) => !existingKeys.has(c.dedupeKey));
+    const refresh = found.filter((c) => existingKeys.has(c.dedupeKey));
+
+    let createdCount = 0;
+    if (fresh.length > 0) {
+      const { error: insertError } = await supabase.from("discovery_candidates").insert(
+        fresh.map((c) => ({
+          tenant_id: tenantId,
+          name: c.name,
+          vertical: c.vertical as never,
+          city: c.city,
+          region: c.region,
+          website: c.website,
+          phone: c.phone,
+          score: c.score,
+          status: "new",
+          provider: MOCK_DISCOVERY_SOURCE,
+          job_id: job.id,
+          dedupe_key: c.dedupeKey,
+          signals: c.signals as never,
+          evidence: c.evidence as never,
+          payload: c.payload as never,
+          observed_at: now,
+        })),
+      );
+      if (insertError) throw insertError;
+      createdCount = fresh.length;
+    }
+
+    let updatedCount = 0;
+    if (refresh.length > 0) {
+      const candidateByKey = new Map(refresh.map((c) => [c.dedupeKey, c]));
+      for (const row of existing ?? []) {
+        if (!row.dedupe_key) continue;
+        const candidate = candidateByKey.get(row.dedupe_key);
+        if (!candidate) continue;
+        const { error: updateError } = await supabase
+          .from("discovery_candidates")
+          .update({
+            score: candidate.score,
+            city: candidate.city,
+            website: candidate.website,
+            phone: candidate.phone,
+            signals: candidate.signals as never,
+            evidence: candidate.evidence as never,
+            payload: candidate.payload as never,
+            job_id: job.id,
+            observed_at: now,
+            updated_at: now,
+          })
+          .eq("tenant_id", tenantId)
+          .eq("id", row.id);
+        if (updateError) throw updateError;
+        updatedCount += 1;
+      }
+    }
+
+    const { error: completeError } = await supabase
+      .from("discovery_jobs")
+      .update({
+        status: "succeeded",
+        found_count: found.length,
+        created_count: createdCount,
+        finished_at: now,
+      })
+      .eq("tenant_id", tenantId)
+      .eq("id", job.id);
+    if (completeError) throw completeError;
+
+    return {
+      status: "succeeded",
+      jobId: job.id,
+      provider: MOCK_DISCOVERY_SOURCE,
+      query,
+      vertical,
+      city,
+      foundCount: found.length,
+      createdCount,
+      updatedCount,
+      error: null,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Discovery run failed.";
+    await supabase
+      .from("discovery_jobs")
+      .update({ status: "failed", error: message, finished_at: new Date().toISOString() })
+      .eq("tenant_id", tenantId)
+      .eq("id", job.id);
+    return {
+      status: "failed",
+      jobId: job.id,
+      provider: MOCK_DISCOVERY_SOURCE,
+      query,
+      vertical,
+      city,
+      foundCount: 0,
+      createdCount: 0,
+      updatedCount: 0,
+      error: message,
+    };
+  }
+}
