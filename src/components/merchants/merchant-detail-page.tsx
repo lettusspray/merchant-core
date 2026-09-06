@@ -894,22 +894,30 @@ export function MerchantDetailPage({ merchantId }: { merchantId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
 
-  const load = useCallback(async () => {
-    setError(null);
-    setNotFound(false);
-    setDetail(null);
-    try {
-      const result = await merchantDetailFn({ data: { merchantId } });
-      setDetail(result);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Could not load merchant.";
-      if (message.toLowerCase().includes("not found")) {
-        setNotFound(true);
-      } else {
-        setError(message);
+  const load = useCallback(
+    async (mode: "initial" | "refresh" = "initial") => {
+      setError(null);
+      setNotFound(false);
+      if (mode === "initial") setDetail(null);
+      try {
+        const result = await merchantDetailFn({ data: { merchantId } });
+        setDetail(result);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Could not load merchant.";
+        if (message.toLowerCase().includes("not found")) {
+          setNotFound(true);
+        } else {
+          setError(message);
+        }
       }
-    }
-  }, [merchantId]);
+    },
+    [merchantId],
+  );
+
+  const refresh = useCallback(async () => {
+    await load("refresh");
+  }, [load]);
+
 
   useEffect(() => {
     if (session.status === "signed-in") {
