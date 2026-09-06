@@ -18,6 +18,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SigninRouteImport } from './routes/signin'
 import { Route as SystemRouteImport } from './routes/system'
 import { Route as VisibilityRouteImport } from './routes/visibility'
+import { Route as MerchantsIdRouteImport } from './routes/merchants.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -64,28 +65,35 @@ const VisibilityRoute = VisibilityRouteImport.update({
   path: '/visibility',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MerchantsIdRoute = MerchantsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => MerchantsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/commerce': typeof CommerceRoute
   '/discovery': typeof DiscoveryRoute
   '/happenings': typeof HappeningsRoute
-  '/merchants': typeof MerchantsRoute
+  '/merchants': typeof MerchantsRouteWithChildren
   '/settings': typeof SettingsRoute
   '/signin': typeof SigninRoute
   '/system': typeof SystemRoute
   '/visibility': typeof VisibilityRoute
+  '/merchants/$id': typeof MerchantsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/commerce': typeof CommerceRoute
   '/discovery': typeof DiscoveryRoute
   '/happenings': typeof HappeningsRoute
-  '/merchants': typeof MerchantsRoute
+  '/merchants': typeof MerchantsRouteWithChildren
   '/settings': typeof SettingsRoute
   '/signin': typeof SigninRoute
   '/system': typeof SystemRoute
   '/visibility': typeof VisibilityRoute
+  '/merchants/$id': typeof MerchantsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -93,11 +101,12 @@ export interface FileRoutesById {
   '/commerce': typeof CommerceRoute
   '/discovery': typeof DiscoveryRoute
   '/happenings': typeof HappeningsRoute
-  '/merchants': typeof MerchantsRoute
+  '/merchants': typeof MerchantsRouteWithChildren
   '/settings': typeof SettingsRoute
   '/signin': typeof SigninRoute
   '/system': typeof SystemRoute
   '/visibility': typeof VisibilityRoute
+  '/merchants/$id': typeof MerchantsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -111,6 +120,7 @@ export interface FileRouteTypes {
     | '/signin'
     | '/system'
     | '/visibility'
+    | '/merchants/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -122,6 +132,7 @@ export interface FileRouteTypes {
     | '/signin'
     | '/system'
     | '/visibility'
+    | '/merchants/$id'
   id:
     | '__root__'
     | '/'
@@ -133,6 +144,7 @@ export interface FileRouteTypes {
     | '/signin'
     | '/system'
     | '/visibility'
+    | '/merchants/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -140,7 +152,7 @@ export interface RootRouteChildren {
   CommerceRoute: typeof CommerceRoute
   DiscoveryRoute: typeof DiscoveryRoute
   HappeningsRoute: typeof HappeningsRoute
-  MerchantsRoute: typeof MerchantsRoute
+  MerchantsRoute: typeof MerchantsRouteWithChildren
   SettingsRoute: typeof SettingsRoute
   SigninRoute: typeof SigninRoute
   SystemRoute: typeof SystemRoute
@@ -212,15 +224,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VisibilityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/merchants/$id': {
+      id: '/merchants/$id'
+      path: '/$id'
+      fullPath: '/merchants/$id'
+      preLoaderRoute: typeof MerchantsIdRouteImport
+      parentRoute: typeof MerchantsRoute
+    }
   }
 }
+
+interface MerchantsRouteChildren {
+  MerchantsIdRoute: typeof MerchantsIdRoute
+}
+
+const MerchantsRouteChildren: MerchantsRouteChildren = {
+  MerchantsIdRoute: MerchantsIdRoute,
+}
+
+const MerchantsRouteWithChildren = MerchantsRoute._addFileChildren(
+  MerchantsRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CommerceRoute: CommerceRoute,
   DiscoveryRoute: DiscoveryRoute,
   HappeningsRoute: HappeningsRoute,
-  MerchantsRoute: MerchantsRoute,
+  MerchantsRoute: MerchantsRouteWithChildren,
   SettingsRoute: SettingsRoute,
   SigninRoute: SigninRoute,
   SystemRoute: SystemRoute,

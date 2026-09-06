@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { FilterX, MapPin, Search, Store, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -159,6 +159,7 @@ function MerchantsErrorState({ message, onRetry }: { message: string; onRetry: (
 
 export function MerchantsPage() {
   const session = useSessionState();
+  const navigate = useNavigate();
   const [searchInput, setSearchInput] = useState("");
   const [status, setStatus] = useState<string>("all");
   const [vertical, setVertical] = useState<string>("all");
@@ -311,12 +312,25 @@ export function MerchantsPage() {
                   {merchants.map((merchant) => {
                     const location = primaryLocation(merchant);
                     return (
-                      <TableRow key={merchant.id}>
+                      <TableRow
+                        key={merchant.id}
+                        className="cursor-pointer"
+                        onClick={() =>
+                          void navigate({ to: "/merchants/$id", params: { id: merchant.id } })
+                        }
+                      >
                         <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{merchant.name}</span>
-                            <span className="text-xs text-muted-foreground">{merchant.slug}</span>
-                          </div>
+                          <Link
+                            to="/merchants/$id"
+                            params={{ id: merchant.id }}
+                            onClick={(event) => event.stopPropagation()}
+                            className="flex flex-col font-medium hover:text-primary"
+                          >
+                            <span>{merchant.name}</span>
+                            <span className="text-xs text-muted-foreground hover:text-primary">
+                              {merchant.slug}
+                            </span>
+                          </Link>
                         </TableCell>
                         <TableCell>
                           {VERTICAL_LABELS[merchant.vertical] ?? merchant.vertical}
