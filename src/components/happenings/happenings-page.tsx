@@ -2,9 +2,11 @@ import { Link } from "@tanstack/react-router";
 import { format } from "date-fns";
 import {
   CalendarClock,
+  CheckCircle2,
   ChevronDown,
   ExternalLink,
   FilterX,
+  ListFilter,
   Search,
   TriangleAlert,
   Webhook,
@@ -32,7 +34,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useSessionState } from "@/hooks/use-session-state";
-import { happeningsListFn } from "@/lib/api/console.functions";
+import { happeningsListFn, updateHappeningStatusFn } from "@/lib/api/console.functions";
 
 type HappeningsPayload = Awaited<ReturnType<typeof happeningsListFn>>;
 type Happening = HappeningsPayload["happenings"][number];
@@ -54,6 +56,20 @@ const STATUS_LABELS: Record<(typeof STATUS_VALUES)[number], string> = {
   approved: "Approved",
   published: "Published",
   rejected: "Rejected",
+};
+
+const ALLOWED_TRANSITIONS: Record<Happening["status"], { status: string; label: string }[]> = {
+  draft: [
+    { status: "in_review", label: "Submit for review" },
+    { status: "rejected", label: "Reject" },
+  ],
+  in_review: [
+    { status: "approved", label: "Approve" },
+    { status: "rejected", label: "Reject" },
+  ],
+  approved: [{ status: "published", label: "Publish" }],
+  published: [],
+  rejected: [{ status: "draft", label: "Reopen as draft" }],
 };
 
 function statusVariant(
@@ -147,12 +163,39 @@ function HappeningRow({
   happening,
   expanded,
   onToggle,
+  onStatusChanged,
 }: {
   happening: Happening;
   expanded: boolean;
   onToggle: () => void;
+  onStatusChanged: () => void;
 }) {
   const merchant = happening.merchants;
+  const transitions = ALLOWED_TRANSITIONS[happening.status] ?? [];
+  const [updating, setUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  const [updateSuccess, setUpdateSuccess] = useState<string | null>(null);
+
+  const handleStatusChange = async (newStatus: string) => {
+    setUpdating(true);
+    setUpdateError(null);
+    setUpdateSuccess(null);
+    try {
+      await updateHappeningStatusFn({
+        data: {
+          happeningId: happening.id,
+          status: newStatus as Happening["status"],
+        },
+      });
+      setUpdateSuccess(`Status changed to ${STATUS_LABELS[newStatus as Happening["status"]]}.`);
+      onStatusChanged();
+    } catch (err) {
+      setUpdateError(err instanceof Error ? err.message : "Update failed.");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   return (
     <>
       <TableRow className="cursor-pointer" onClick={onToggle}>
@@ -248,10 +291,45 @@ function HappeningRow({
                   </p>
                 </div>
               ) : null}
-              <div className="rounded-md border border-dashed p-2.5 text-xs text-muted-foreground">
-                Status write is not wired yet — approve / reject / set status is read-only in this
-                build. No publish to public sites.
-              </div>
+              {transitions.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">Actions</p>
+                  <div className="flex flex-wrap gap-2">
+                    {transitions.map((t) => (
+                      <Button
+                        key={t.status}
+                        size="sm"
+                        variant={
+                          t.status === "rejected"
+                            ? "destructive"
+                            : t.status === "published"
+                              ? "default"
+                              : "outline"
+                        }
+                        disabled={updating}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleStatusChange(t.status);
+                        }}
+                      >
+                        {t.label}
+                      </Button>
+                    ))}
+                  </div>
+                  {updateError ? (
+                    <p className="text-xs text-destructive">{updateError}</p>
+                  ) : updateSuccess ? (
+                    <p className="flex items-center gap-1 text-xs text-emerald-600">
+                      <CheckCircle2 className="size-3.5" />
+                      {updateSuccess}
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="rounded-md border border-dashed p-2.5 text-xs text-muted-foreground">
+                  No further status transitions available from this state.
+                </div>
+              )}
             </div>
           </TableCell>
         </TableRow>
@@ -264,6 +342,7 @@ export function HappeningsPage() {
   const session = useSessionState();
   const [searchInput, setSearchInput] = useState("");
   const [status, setStatus] = useState<string>("all");
+  const [kind, setKind] = useState<string>("all");
   const [happenings, setHappenings] = useState<Happening[] | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -273,9 +352,10 @@ export function HappeningsPage() {
     setLoading(true);
     setError(null);
     try {
-      const data: { q?: string; status?: string } = {};
+      const data: { q?: string; status?: string; kind?: string } = {};
       if (searchInput.trim()) data.q = searchInput.trim();
       if (status !== "all") data.status = status;
+      if (kind !== "all") data.kind = kind;
       const result = await happeningsListFn({ data });
       setHappenings(result.happenings);
     } catch (err) {
@@ -284,7 +364,7 @@ export function HappeningsPage() {
     } finally {
       setLoading(false);
     }
-  }, [searchInput, status]);
+  }, [searchInput, status, kind]);
 
   useEffect(() => {
     if (session.status !== "signed-in") return;
@@ -292,11 +372,12 @@ export function HappeningsPage() {
     return () => clearTimeout(timer);
   }, [session.status, load]);
 
-  const hasFilters = searchInput.trim() !== "" || status !== "all";
+  const hasFilters = searchInput.trim() !== "" || status !== "all" || kind !== "all";
 
   const resetFilters = () => {
     setSearchInput("");
     setStatus("all");
+    setKind("all");
     void load();
   };
 
@@ -363,6 +444,24 @@ export function HappeningsPage() {
             ))}
           </SelectContent>
         </Select>
+
+        <Select value={kind} onValueChange={(value) => setKind(value === "all" ? "all" : value)}>
+          <SelectTrigger className="w-full sm:w-44">
+            <div className="flex items-center gap-1.5">
+              <ListFilter className="size-3.5 text-muted-foreground" />
+              <SelectValue placeholder="Kind" />
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All kinds</SelectItem>
+            {KIND_VALUES.map((value) => (
+              <SelectItem key={value} value={value}>
+                {KIND_LABELS[value]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         {hasFilters ? (
           <Button size="sm" variant="ghost" onClick={resetFilters}>
             <FilterX className="size-4" />
@@ -395,6 +494,7 @@ export function HappeningsPage() {
                       onToggle={() =>
                         setExpandedId((current) => (current === happening.id ? null : happening.id))
                       }
+                      onStatusChanged={() => void load()}
                     />
                   ))}
                 </TableBody>

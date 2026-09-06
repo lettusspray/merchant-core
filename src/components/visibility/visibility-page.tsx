@@ -1,11 +1,27 @@
 import { Link } from "@tanstack/react-router";
 import { format } from "date-fns";
-import { ChevronDown, Cpu, ExternalLink, Eye, Info, TriangleAlert } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  Cpu,
+  ExternalLink,
+  Eye,
+  Info,
+  Play,
+  TriangleAlert,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -16,9 +32,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useSessionState } from "@/hooks/use-session-state";
-import { visibilityRunsFn } from "@/lib/api/console.functions";
+import {
+  merchantsListFn,
+  runMockVisibilityFn,
+  visibilityRunsFn,
+} from "@/lib/api/console.functions";
 
 type RunsPayload = Awaited<ReturnType<typeof visibilityRunsFn>>;
+type MerchantOption = { id: string; name: string };
 type Run = RunsPayload["runs"][number];
 
 function formatDate(value: string): string {
@@ -76,6 +97,9 @@ function VisibilityErrorState({ message, onRetry }: { message: string; onRetry: 
     </Card>
   );
 }
+
+const MOCK_PROVIDER_NOTE =
+  "Runs a local readiness estimate computed from the merchant\u2019s own data. No external AI provider is called, and rows are persisted and labelled as mock.";
 
 function RunRow({
   run,
@@ -198,11 +222,6 @@ function RunRow({
                   ))}
                 </div>
               ) : null}
-              <div className="rounded-md border border-dashed p-2.5 text-xs text-muted-foreground">
-                Run command is not wired in this build. Runs shown here are persisted by the
-                visibility pipeline; the local readiness estimator is labelled as such and never
-                presented as an external AI provider answer.
-              </div>
             </div>
           </TableCell>
         </TableRow>
@@ -214,18 +233,28 @@ function RunRow({
 export function VisibilityPage() {
   const session = useSessionState();
   const [runs, setRuns] = useState<Run[] | null>(null);
+  const [merchants, setMerchants] = useState<MerchantOption[] | null>(null);
+  const [selectedMerchantId, setSelectedMerchantId] = useState<string>("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+  const [runFeedback, setRunFeedback] = useState<string | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const result = await visibilityRunsFn({ data: {} });
-      setRuns(result.runs);
+      const [runResult, merchantResult] = await Promise.all([
+        visibilityRunsFn({ data: {} }),
+        merchantsListFn({ data: {} }),
+      ]);
+      setRuns(runResult.runs);
+      setMerchants(merchantResult.merchants.map((m) => ({ id: m.id, name: m.name })));
     } catch (err) {
       setRuns(null);
+      setMerchants(null);
       setError(err instanceof Error ? err.message : "Could not load visibility runs.");
     } finally {
       setLoading(false);
@@ -236,6 +265,26 @@ export function VisibilityPage() {
     if (session.status !== "signed-in") return;
     void load();
   }, [session.status, load]);
+
+  const handleRunMock = async () => {
+    if (!selectedMerchantId) return;
+    setRunning(true);
+    setRunError(null);
+    setRunFeedback(null);
+    try {
+      const result = await runMockVisibilityFn({ data: { merchantId: selectedMerchantId } });
+      setRunFeedback(
+        `Local readiness run complete — ${result.result.snapshots} snapshot(s) recorded.`,
+      );
+      const fresh = await visibilityRunsFn({ data: {} });
+      setRuns(fresh.runs);
+      setExpandedId(result.result.runId);
+    } catch (err) {
+      setRunError(err instanceof Error ? err.message : "Could not run local visibility.");
+    } finally {
+      setRunning(false);
+    }
+  };
 
   if (session.status === "checking") {
     return <VisibilityTableShimmer />;
@@ -273,6 +322,59 @@ export function VisibilityPage() {
 
   return (
     <div className="space-y-4">
+      <Card>
+        <CardContent className="space-y-3 pt-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex flex-1 items-center gap-2">
+              <Select
+                value={selectedMerchantId}
+                onValueChange={(value) => {
+                  setSelectedMerchantId(value);
+                  setRunFeedback(null);
+                  setRunError(null);
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-72">
+                  <SelectValue placeholder="Select a merchant" />
+                </SelectTrigger>
+                <SelectContent>
+                  {merchants && merchants.length > 0 ? (
+                    merchants.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>
+                      No merchants yet
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                disabled={!selectedMerchantId || running}
+                onClick={() => void handleRunMock()}
+              >
+                <Play className="size-4" />
+                {running ? "Running…" : "Run local visibility"}
+              </Button>
+            </div>
+          </div>
+          <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+            <Info className="mt-0.5 size-3.5 shrink-0" />
+            <span>{MOCK_PROVIDER_NOTE}</span>
+          </p>
+          {runFeedback ? (
+            <p className="flex items-center gap-1 text-xs text-emerald-600">
+              <CheckCircle2 className="size-3.5" />
+              {runFeedback}
+            </p>
+          ) : null}
+          {runError ? <p className="text-xs text-destructive">{runError}</p> : null}
+        </CardContent>
+      </Card>
+
       {empty ? (
         <Card className="border-dashed">
           <CardHeader className="items-center text-center">
@@ -282,7 +384,8 @@ export function VisibilityPage() {
             <CardTitle className="text-base">No visibility runs yet</CardTitle>
             <CardDescription>
               Visibility runs appear here as the pipeline evaluates merchants against AI engines.
-              Scores and citations are grouped per run once a run has executed.
+              Scores and citations are grouped per run once a run has executed. Use “Run local
+              visibility” above to generate an estimate from your own data.
             </CardDescription>
           </CardHeader>
         </Card>

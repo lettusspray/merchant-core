@@ -204,3 +204,13 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+## Demo data
+
+There is no separate seed script — demo rows live in the migrations and load when migrations apply (e.g. `supabase db push` or via your hosted Supabase migration runner):
+
+- `supabase/migrations/20260826170846_*sql` — under `-- ============ SEED ============`. It creates the **Merchant Core Demo** tenant (`...0d1`) plus 6 merchants (restaurant, home service, beauty, pet, automotive, local retail), each with locations, business hours, contacts, products/services/offers, websites + pages, observations, orders/order items, a subscription, and related events.
+- Sign-up: the `on_auth_user_created` trigger auto-joins every new user to the demo tenant as **owner** — create any account via the Sign in → *Create account* flow and you instantly see all demo data.
+- Discovery: `discovery_candidates` and `happenings` + `happening_reviews` rows are seeded so the queue and review pages have data on first load.
+- Sample AI-visibility: `visibility_queries` and `visibility_snapshots` are seeded; the **Visibility** page can also run the local readiness estimator (no MercerCroft credentials required — results are labelled as local, never as live AI answers).
+- Empty environments: re-run migrations (or apply them to a fresh branch) to reload the demo workspace.

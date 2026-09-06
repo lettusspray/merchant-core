@@ -34,7 +34,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useSessionState } from "@/hooks/use-session-state";
-import { discoveryCandidatesFn } from "@/lib/api/console.functions";
+import { discoveryCandidatesFn, promoteCandidateFn } from "@/lib/api/console.functions";
 
 type DiscoveryPayload = Awaited<ReturnType<typeof discoveryCandidatesFn>>;
 type Candidate = DiscoveryPayload["candidates"][number];
@@ -176,11 +176,30 @@ function CandidateRow({
   candidate,
   expanded,
   onToggle,
+  onPromoted,
 }: {
   candidate: Candidate;
   expanded: boolean;
   onToggle: () => void;
+  onPromoted: () => void;
 }) {
+  const [promoting, setPromoting] = useState(false);
+  const [promoteError, setPromoteError] = useState<string | null>(null);
+  const canPromote = candidate.status !== "claimed" && !candidate.merchant_id;
+
+  const handlePromote = async () => {
+    setPromoting(true);
+    setPromoteError(null);
+    try {
+      await promoteCandidateFn({ data: { candidateId: candidate.id } });
+      onPromoted();
+    } catch (err) {
+      setPromoteError(err instanceof Error ? err.message : "Promote failed.");
+    } finally {
+      setPromoting(false);
+    }
+  };
+
   return (
     <>
       <TableRow className="cursor-pointer" onClick={onToggle}>
@@ -283,6 +302,26 @@ function CandidateRow({
                 <JsonPreview title="Evidence" value={candidate.evidence} />
                 <JsonPreview title="Payload" value={candidate.payload} />
               </div>
+              {canPromote ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground">Actions</p>
+                  <Button
+                    size="sm"
+                    disabled={promoting}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void handlePromote();
+                    }}
+                  >
+                    {promoting ? "Promoting…" : "Promote to merchant"}
+                  </Button>
+                  {promoteError ? <p className="text-xs text-destructive">{promoteError}</p> : null}
+                </div>
+              ) : candidate.merchant_id ? (
+                <div className="rounded-md border border-dashed p-2.5 text-xs text-muted-foreground">
+                  Already linked to a merchant.
+                </div>
+              ) : null}
             </div>
           </TableCell>
         </TableRow>
@@ -428,6 +467,7 @@ export function DiscoveryPage() {
                       onToggle={() =>
                         setExpandedId((current) => (current === candidate.id ? null : candidate.id))
                       }
+                      onPromoted={() => void load()}
                     />
                   ))}
                 </TableBody>

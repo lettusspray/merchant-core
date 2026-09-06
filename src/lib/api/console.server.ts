@@ -5,6 +5,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
+import { mockVisibilityAdapter, type VisibilityEngine } from "@/lib/adapters/visibility.server";
 
 export type Db = SupabaseClient<Database>;
 
@@ -179,7 +180,7 @@ export async function discoveryCandidates(
 export async function happeningsList(
   supabase: Db,
   tenantId: string,
-  filters: { search?: string; status?: string },
+  filters: { search?: string; status?: string; kind?: string },
 ) {
   let query = supabase
     .from("happenings")
@@ -188,9 +189,37 @@ export async function happeningsList(
     .order("created_at", { ascending: false });
   if (filters.search) query = query.ilike("title", `%${filters.search}%`);
   if (filters.status) query = query.eq("status", filters.status as never);
+  if (filters.kind) query = query.eq("kind", filters.kind as never);
   const { data, error } = await query;
   if (error) throw error;
   return data ?? [];
+}
+
+export async function updateHappeningStatus(
+  supabase: Db,
+  tenantId: string,
+  actorId: string,
+  happeningId: string,
+  status: "draft" | "in_review" | "approved" | "published" | "rejected",
+  notes?: string,
+) {
+  const { error } = await supabase
+    .from("happenings")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("tenant_id", tenantId)
+    .eq("id", happeningId)
+    .select("id")
+    .single();
+  if (error) throw error;
+
+  const { error: reviewError } = await supabase.from("happening_reviews").insert({
+    tenant_id: tenantId,
+    happening_id: happeningId,
+    reviewer_id: actorId,
+    action: status,
+    notes: notes ?? null,
+  });
+  if (reviewError) throw reviewError;
 }
 
 export async function visibilityRuns(supabase: Db, tenantId: string, merchantId?: string) {
@@ -222,21 +251,28 @@ export async function visibilitySnapshots(
   return data ?? [];
 }
 
-export async function ordersList(supabase: Db, tenantId: string, limit = 100) {
-  const [orders, subscriptions] = await Promise.all([
-    supabase
-      .from("orders")
-      .select("*, merchants(name)")
-      .eq("tenant_id", tenantId)
-      .order("placed_at", { ascending: false })
-      .limit(limit),
-    supabase
-      .from("subscriptions")
-      .select("*, merchants(name)")
-      .eq("tenant_id", tenantId)
-      .order("created_at", { ascending: false })
-      .limit(limit),
-  ]);
+export async function ordersList(
+  supabase: Db,
+  tenantId: string,
+  filter?: { status?: string },
+  limit = 100,
+) {
+  let ordersQuery = supabase
+    .from("orders")
+    .select("*, merchants(name), order_items(*)")
+    .eq("tenant_id", tenantId)
+    .order("placed_at", { ascending: false })
+    .limit(limit);
+  if (filter?.status) ordersQuery = ordersQuery.eq("status", filter.status as never);
+
+  const subscriptionsQuery = supabase
+    .from("subscriptions")
+    .select("*, merchants(name)")
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  const [orders, subscriptions] = await Promise.all([ordersQuery, subscriptionsQuery]);
   if (orders.error) throw orders.error;
   if (subscriptions.error) throw subscriptions.error;
   return { orders: orders.data ?? [], subscriptions: subscriptions.data ?? [] };
@@ -341,4 +377,227 @@ export async function merchantDetail(supabase: Db, tenantId: string, merchantId:
     subscription: subscription.data ?? null,
     events: events.data ?? [],
   };
+}
+
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
+}
+
+export async function promoteCandidate(
+  supabase: Db,
+  tenantId: string,
+  actorId: string,
+  candidateId: string,
+) {
+  const { data: candidate, error: fetchError } = await supabase
+    .from("discovery_candidates")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .eq("id", candidateId)
+    .single();
+  if (fetchError) throw fetchError;
+  if (!candidate) throw new Error("Candidate not found");
+
+  const slug = slugify(candidate.name) + "-" + candidateId.slice(0, 6);
+
+  const { data: merchant, error: merchantError } = await supabase
+    .from("merchants")
+    .insert({
+      tenant_id: tenantId,
+      name: candidate.name,
+      slug,
+      vertical: candidate.vertical,
+      status: "prospect",
+    })
+    .select("id, name, slug, vertical, status, created_at")
+    .single();
+  if (merchantError) throw merchantError;
+
+  const { error: updateError } = await supabase
+    .from("discovery_candidates")
+    .update({
+      status: "claimed",
+      merchant_id: merchant.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("tenant_id", tenantId)
+    .eq("id", candidateId);
+  if (updateError) throw updateError;
+
+  if (candidate.city || candidate.region) {
+    const { error: locationError } = await supabase.from("locations").insert({
+      tenant_id: tenantId,
+      merchant_id: merchant.id,
+      label: candidate.name,
+      city: candidate.city ?? null,
+      region: candidate.region ?? null,
+      is_primary: true,
+    });
+    if (locationError) throw locationError;
+  }
+
+  return merchant;
+}
+
+export async function createMerchant(
+  supabase: Db,
+  tenantId: string,
+  input: { name: string; vertical?: string; city?: string; region?: string },
+) {
+  const slug = slugify(input.name) + "-" + Date.now().toString(36);
+
+  const { data: merchant, error: merchantError } = await supabase
+    .from("merchants")
+    .insert({
+      tenant_id: tenantId,
+      name: input.name,
+      slug,
+      vertical: (input.vertical as never) ?? "other",
+      status: "prospect",
+    })
+    .select("id, name, slug, vertical, status, created_at")
+    .single();
+  if (merchantError) throw merchantError;
+
+  if (input.city || input.region) {
+    const { error: locationError } = await supabase.from("locations").insert({
+      tenant_id: tenantId,
+      merchant_id: merchant.id,
+      label: input.name,
+      city: input.city ?? null,
+      region: input.region ?? null,
+      is_primary: true,
+    });
+    if (locationError) throw locationError;
+  }
+
+  return merchant;
+}
+
+export async function runMockVisibility(
+  supabase: Db,
+  tenantId: string,
+  actorId: string,
+  merchantId: string,
+) {
+  const { data: merchant, error: merchantError } = await supabase
+    .from("merchants")
+    .select(
+      "id, name, vertical, data_quality, websites(state, domain), products(id), services(id), offers(id), locations(city, region)",
+    )
+    .eq("tenant_id", tenantId)
+    .eq("id", merchantId)
+    .single();
+  if (merchantError) throw merchantError;
+  if (!merchant) throw new Error("Merchant not found");
+
+  const websites = Array.isArray(merchant.websites) ? merchant.websites : [];
+  const website = websites[0] as { state: string | null; domain: string | null } | undefined;
+  const published = website?.state === "published";
+  const locations = Array.isArray(merchant.locations) ? merchant.locations : [];
+  const primaryLocation = locations.find((l) => (l as { is_primary?: boolean }).is_primary) as
+    { city: string | null; region: string | null } | undefined;
+  const city = primaryLocation?.city ?? null;
+  const region = primaryLocation?.region ?? null;
+
+  const vertical = String(merchant.vertical ?? "local business");
+  const productCount = Array.isArray(merchant.products) ? merchant.products.length : 0;
+  const serviceCount = Array.isArray(merchant.services) ? merchant.services.length : 0;
+  const offerCount = Array.isArray(merchant.offers) ? merchant.offers.length : 0;
+
+  const scope = [city, region, vertical].filter(Boolean).join(" · ");
+  const prompts = [
+    {
+      id: crypto.randomUUID(),
+      prompt: `When customers ask for a ${vertical} in ${scope || "this area"}, does ${merchant.name} show up with accurate details?`,
+      intent: "local_presence",
+    },
+    {
+      id: crypto.randomUUID(),
+      prompt: `Evaluating the online storefront of ${merchant.name}: is it complete, accurate, and compelling enough to turn a search into a visit?`,
+      intent: "storefront_readiness",
+    },
+  ];
+
+  const { error: queriesError } = await supabase.from("visibility_queries").insert(
+    prompts.map((p) => ({
+      id: p.id,
+      tenant_id: tenantId,
+      merchant_id: merchantId,
+      prompt: p.prompt,
+      intent: p.intent,
+    })),
+  );
+  if (queriesError) throw queriesError;
+
+  const engines: VisibilityEngine[] = [{ engine: "local-readiness", model: "canonical-data-v1" }];
+
+  const runResult = await mockVisibilityAdapter().run({
+    merchantId,
+    merchantName: merchant.name,
+    locale: "en",
+    city,
+    prompts,
+    engines,
+    idempotencyKey: crypto.randomUUID(),
+    context: {
+      website: website?.domain ?? null,
+      published,
+      productCount,
+      serviceCount,
+      publishedUpdates: offerCount,
+      dataQuality: merchant.data_quality,
+    },
+  });
+
+  const now = new Date().toISOString();
+  const { data: run, error: runError } = await supabase
+    .from("visibility_runs")
+    .insert({
+      tenant_id: tenantId,
+      merchant_id: merchantId,
+      provider: runResult.provider,
+      mode: runResult.mode,
+      status: runResult.status,
+      engines: engines as never,
+      metrics: runResult.metrics as never,
+      warnings: runResult.warnings as never,
+      cost_usd: runResult.costUsd,
+      started_at: now,
+      finished_at: now,
+      system_version: runResult.systemVersion,
+      requested_by: actorId,
+    })
+    .select("id")
+    .single();
+  if (runError) throw runError;
+
+  const snapshots = runResult.results.map((row) => ({
+    tenant_id: tenantId,
+    merchant_id: merchantId,
+    run_id: run.id,
+    query_id: row.queryId,
+    engine: row.engine,
+    provider: runResult.provider,
+    model: row.model,
+    score: row.score,
+    rank: row.rank,
+    mentioned: row.mentioned,
+    recommended: row.recommended,
+    sentiment: row.sentiment,
+    factual_accuracy: row.factualAccuracy,
+    answer_excerpt: row.answerExcerpt,
+    citations: row.citations as never,
+    mentioned_entities: row.mentionedEntities as never,
+    cost_usd: row.costUsd,
+    captured_at: row.capturedAt,
+  }));
+  const { error: snapshotsError } = await supabase.from("visibility_snapshots").insert(snapshots);
+  if (snapshotsError) throw snapshotsError;
+
+  return { runId: run.id, mode: runResult.mode, snapshots: snapshots.length };
 }

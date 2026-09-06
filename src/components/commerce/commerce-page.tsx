@@ -1,12 +1,26 @@
 import { Link } from "@tanstack/react-router";
 import { format } from "date-fns";
-import { ExternalLink, Receipt, ShoppingCart, TriangleAlert, Repeat } from "lucide-react";
+import {
+  ChevronDown,
+  ExternalLink,
+  Receipt,
+  ShoppingCart,
+  TriangleAlert,
+  Repeat,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -21,6 +35,8 @@ import { ordersListFn } from "@/lib/api/console.functions";
 type CommercePayload = Awaited<ReturnType<typeof ordersListFn>>;
 type Order = CommercePayload["orders"][number];
 type Subscription = CommercePayload["subscriptions"][number];
+
+const ORDER_STATUS_VALUES = ["pending", "paid", "fulfilled", "cancelled", "refunded"] as const;
 
 function formatCents(cents: number, currency: string): string {
   return new Intl.NumberFormat("en-US", {
@@ -128,10 +144,120 @@ function MerchantNameLink({ merchantId, name }: { merchantId: string; name: stri
   );
 }
 
+function OrderRow({
+  order,
+  expanded,
+  onToggle,
+}: {
+  order: Order;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const items = (order.order_items ?? []) as {
+    id: string;
+    description: string;
+    quantity: number;
+    unit_price_cents: number;
+  }[];
+  return (
+    <>
+      <TableRow className="cursor-pointer" onClick={onToggle}>
+        <TableCell>
+          <div className="flex items-center gap-2">
+            <ChevronDown
+              className={`size-4 shrink-0 text-muted-foreground transition-transform ${expanded ? "" : "-rotate-90"}`}
+            />
+            <span className="font-medium">{order.reference}</span>
+          </div>
+        </TableCell>
+        <TableCell>
+          <MerchantNameLink merchantId={order.merchant_id} name={order.merchants?.name ?? null} />
+        </TableCell>
+        <TableCell>
+          <Badge variant={orderVariant(order.status)}>
+            {ORDER_STATUS_LABELS[order.status] ?? order.status}
+          </Badge>
+        </TableCell>
+        <TableCell className="text-right">
+          {formatCents(order.total_cents, order.currency)}
+        </TableCell>
+        <TableCell className="text-right text-muted-foreground">
+          {formatDate(order.placed_at)}
+        </TableCell>
+      </TableRow>
+      {expanded ? (
+        <TableRow>
+          <TableCell colSpan={5} className="bg-muted/30 p-0">
+            <div className="space-y-4 p-4">
+              <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Customer</p>
+                  <p>{order.customer_name ?? order.customer_email ?? "—"}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Provider</p>
+                  <p>{order.provider}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Reference</p>
+                  <p className="break-all text-muted-foreground">{order.reference}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Commission</p>
+                  <p>
+                    {formatCents(order.total_cents, order.currency)} · {order.commission_bps} bps
+                  </p>
+                </div>
+              </div>
+              {items.length > 0 ? (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">Line items</p>
+                  <div className="overflow-hidden rounded-md border">
+                    <Table className="bg-background">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Item</TableHead>
+                          <TableHead className="text-right">Qty</TableHead>
+                          <TableHead className="text-right">Unit price</TableHead>
+                          <TableHead className="text-right">Line total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {items.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell className="font-medium">{item.description}</TableCell>
+                            <TableCell className="text-right">{item.quantity}</TableCell>
+                            <TableCell className="text-right">
+                              {formatCents(item.unit_price_cents, order.currency)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatCents(item.unit_price_cents * item.quantity, order.currency)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-md border border-dashed p-2.5 text-xs text-muted-foreground">
+                  No line items recorded for this order.
+                </div>
+              )}
+            </div>
+          </TableCell>
+        </TableRow>
+      ) : null}
+    </>
+  );
+}
+
 export function CommercePage() {
   const session = useSessionState();
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [subscriptions, setSubscriptions] = useState<Subscription[] | null>(null);
+  const [orderStatus, setOrderStatus] = useState<string>("all");
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -139,7 +265,9 @@ export function CommercePage() {
     setLoading(true);
     setError(null);
     try {
-      const result = await ordersListFn();
+      const data: { status?: string } = {};
+      if (orderStatus !== "all") data.status = orderStatus;
+      const result = await ordersListFn({ data });
       setOrders(result.orders);
       setSubscriptions(result.subscriptions);
     } catch (err) {
@@ -149,7 +277,7 @@ export function CommercePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [orderStatus]);
 
   useEffect(() => {
     if (session.status !== "signed-in") return;
@@ -194,9 +322,27 @@ export function CommercePage() {
   return (
     <div className="space-y-6">
       <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Receipt className="size-4 text-muted-foreground" />
-          <h3 className="text-lg font-semibold">Orders</h3>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <Receipt className="size-4 text-muted-foreground" />
+            <h3 className="text-lg font-semibold">Orders</h3>
+          </div>
+          <Select
+            value={orderStatus}
+            onValueChange={(value) => setOrderStatus(value === "all" ? "all" : value)}
+          >
+            <SelectTrigger className="w-full sm:w-44">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {ORDER_STATUS_VALUES.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {ORDER_STATUS_LABELS[value]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         {ordersEmpty ? (
           <Card className="border-dashed">
@@ -224,26 +370,14 @@ export function CommercePage() {
                   </TableHeader>
                   <TableBody>
                     {orders.map((order) => (
-                      <TableRow key={order.id}>
-                        <TableCell className="font-medium">{order.reference}</TableCell>
-                        <TableCell>
-                          <MerchantNameLink
-                            merchantId={order.merchant_id}
-                            name={order.merchants?.name ?? null}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={orderVariant(order.status)}>
-                            {ORDER_STATUS_LABELS[order.status] ?? order.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCents(order.total_cents, order.currency)}
-                        </TableCell>
-                        <TableCell className="text-right text-muted-foreground">
-                          {formatDate(order.placed_at)}
-                        </TableCell>
-                      </TableRow>
+                      <OrderRow
+                        key={order.id}
+                        order={order}
+                        expanded={expandedOrderId === order.id}
+                        onToggle={() =>
+                          setExpandedOrderId((current) => (current === order.id ? null : order.id))
+                        }
+                      />
                     ))}
                   </TableBody>
                 </Table>

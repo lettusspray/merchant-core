@@ -1,11 +1,20 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
-import { FilterX, MapPin, Search, Store, TriangleAlert } from "lucide-react";
+import { FilterX, MapPin, Plus, Search, Store, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -24,7 +33,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useSessionState } from "@/hooks/use-session-state";
-import { merchantsListFn } from "@/lib/api/console.functions";
+import { createMerchantFn, merchantsListFn } from "@/lib/api/console.functions";
 
 type MerchantsPayload = Awaited<ReturnType<typeof merchantsListFn>>;
 type Merchant = MerchantsPayload["merchants"][number];
@@ -103,9 +112,11 @@ function MerchantsTableShimmer() {
 function MerchantsEmptyState({
   hasFilters,
   onReset,
+  onAdd,
 }: {
   hasFilters: boolean;
   onReset: () => void;
+  onAdd: () => void;
 }) {
   return (
     <Card className="border-dashed">
@@ -122,14 +133,20 @@ function MerchantsEmptyState({
             : "Merchants will appear here as they are added, enriched, or discovered in this workspace."}
         </CardDescription>
       </CardHeader>
-      {hasFilters ? (
-        <CardContent className="flex justify-center pb-6">
+      <CardContent className="flex justify-center gap-2 pb-6">
+        {!hasFilters ? (
+          <Button size="sm" onClick={onAdd}>
+            <Plus className="size-4" />
+            Add merchant
+          </Button>
+        ) : null}
+        {hasFilters ? (
           <Button size="sm" variant="outline" onClick={onReset}>
             <FilterX className="size-4" />
             Clear filters
           </Button>
-        </CardContent>
-      ) : null}
+        ) : null}
+      </CardContent>
     </Card>
   );
 }
@@ -166,6 +183,13 @@ export function MerchantsPage() {
   const [merchants, setMerchants] = useState<Merchant[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [createVertical, setCreateVertical] = useState<string>("other");
+  const [createCity, setCreateCity] = useState("");
+  const [createRegion, setCreateRegion] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -199,6 +223,38 @@ export function MerchantsPage() {
     setStatus("all");
     setVertical("all");
     void load();
+  };
+
+  const handleCreate = async () => {
+    if (!createName.trim()) return;
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const city = createCity.trim();
+      const region = createRegion.trim();
+      const result = await createMerchantFn({
+        data: {
+          name: createName.trim(),
+          vertical: createVertical,
+          ...(city ? { city } : {}),
+          ...(region ? { region } : {}),
+        },
+      });
+      setShowCreate(false);
+      setCreateName("");
+      setCreateVertical("other");
+      setCreateCity("");
+      setCreateRegion("");
+      await load();
+      void navigate({
+        to: "/merchants/$id",
+        params: { id: result.merchant.id },
+      });
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Could not create merchant.");
+    } finally {
+      setCreating(false);
+    }
   };
 
   if (session.status === "checking") {
@@ -289,11 +345,20 @@ export function MerchantsPage() {
               Reset
             </Button>
           ) : null}
+
+          <Button size="sm" onClick={() => setShowCreate(true)}>
+            <Plus className="size-4" />
+            Add merchant
+          </Button>
         </div>
       </div>
 
       {empty ? (
-        <MerchantsEmptyState hasFilters={hasFilters} onReset={resetFilters} />
+        <MerchantsEmptyState
+          hasFilters={hasFilters}
+          onReset={resetFilters}
+          onAdd={() => setShowCreate(true)}
+        />
       ) : (
         <Card>
           <CardContent className="p-0">
@@ -362,6 +427,79 @@ export function MerchantsPage() {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add merchant</DialogTitle>
+            <DialogDescription>
+              Create a new merchant in this workspace. Only name is required — you can enrich the
+              profile later.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="merchant-name">Name *</Label>
+              <Input
+                id="merchant-name"
+                placeholder="e.g. Acme Coffee"
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && createName.trim()) {
+                    e.preventDefault();
+                    void handleCreate();
+                  }
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Vertical</Label>
+              <Select value={createVertical} onValueChange={setCreateVertical}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {VERTICAL_VALUES.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {VERTICAL_LABELS[value]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="merchant-city">City</Label>
+                <Input
+                  id="merchant-city"
+                  placeholder="Optional"
+                  value={createCity}
+                  onChange={(e) => setCreateCity(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="merchant-region">Region</Label>
+                <Input
+                  id="merchant-region"
+                  placeholder="Optional"
+                  value={createRegion}
+                  onChange={(e) => setCreateRegion(e.target.value)}
+                />
+              </div>
+            </div>
+            {createError ? <p className="text-xs text-destructive">{createError}</p> : null}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreate(false)} disabled={creating}>
+              Cancel
+            </Button>
+            <Button onClick={() => void handleCreate()} disabled={creating || !createName.trim()}>
+              {creating ? "Creating…" : "Create merchant"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -6,6 +6,13 @@ import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -16,8 +23,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useSessionState } from "@/hooks/use-session-state";
-import { providerStatuses, type ProviderConfigStatus } from "@/lib/config.server";
-import { systemActivityFn } from "@/lib/api/console.functions";
+import { providerStatusesFn, systemActivityFn } from "@/lib/api/console.functions";
+
+type ProviderConfigStatus = {
+  provider: string;
+  category: string;
+  label: string;
+  configured: boolean;
+  requires: string[];
+  present: string[];
+  detail: string;
+};
 
 type SystemPayload = Awaited<ReturnType<typeof systemActivityFn>>;
 type EventRow = SystemPayload["events"][number];
@@ -47,6 +63,8 @@ const WORKFLOW_LABELS: Record<WorkflowRun["status"], string> = {
   succeeded: "Succeeded",
   failed: "Failed",
 };
+
+const WORKFLOW_STATUS_VALUES = ["queued", "running", "succeeded", "failed"] as const;
 
 function SystemTableShimmer() {
   return (
@@ -108,20 +126,26 @@ export function SystemPage() {
   const session = useSessionState();
   const [events, setEvents] = useState<EventRow[] | null>(null);
   const [workflows, setWorkflows] = useState<WorkflowRun[] | null>(null);
+  const [statuses, setStatuses] = useState<ProviderConfigStatus[]>([]);
+  const [workflowFilter, setWorkflowFilter] = useState<string>("all");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [statuses] = useState<ProviderConfigStatus[]>(() => providerStatuses());
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const result = await systemActivityFn();
-      setEvents(result.events);
-      setWorkflows(result.workflows);
+      const [activity, statusResult] = await Promise.all([
+        systemActivityFn(),
+        providerStatusesFn(),
+      ]);
+      setEvents(activity.events);
+      setWorkflows(activity.workflows);
+      setStatuses(statusResult.statuses);
     } catch (err) {
       setEvents(null);
       setWorkflows(null);
+      setStatuses([]);
       setError(err instanceof Error ? err.message : "Could not load system activity.");
     } finally {
       setLoading(false);
@@ -232,9 +256,27 @@ export function SystemPage() {
       </section>
 
       <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Workflow className="size-4 text-muted-foreground" />
-          <h3 className="text-lg font-semibold">Workflow runs</h3>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <Workflow className="size-4 text-muted-foreground" />
+            <h3 className="text-lg font-semibold">Workflow runs</h3>
+          </div>
+          <Select
+            value={workflowFilter}
+            onValueChange={(value) => setWorkflowFilter(value === "all" ? "all" : value)}
+          >
+            <SelectTrigger className="w-full sm:w-44">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              {WORKFLOW_STATUS_VALUES.map((value) => (
+                <SelectItem key={value} value={value}>
+                  {WORKFLOW_LABELS[value]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         {workflowsEmpty ? (
           <Card className="border-dashed">
@@ -260,23 +302,25 @@ export function SystemPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {workflows.map((run) => (
-                      <TableRow key={run.id}>
-                        <TableCell className="font-medium">{run.workflow}</TableCell>
-                        <TableCell>{run.engine}</TableCell>
-                        <TableCell>
-                          <Badge variant={workflowVariant(run.status)}>
-                            {WORKFLOW_LABELS[run.status] ?? run.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right text-muted-foreground">
-                          {formatDate(run.started_at)}
-                        </TableCell>
-                        <TableCell className="max-w-xs truncate text-destructive">
-                          {run.error ?? "—"}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {workflows
+                      .filter((run) => workflowFilter === "all" || run.status === workflowFilter)
+                      .map((run) => (
+                        <TableRow key={run.id}>
+                          <TableCell className="font-medium">{run.workflow}</TableCell>
+                          <TableCell>{run.engine}</TableCell>
+                          <TableCell>
+                            <Badge variant={workflowVariant(run.status)}>
+                              {WORKFLOW_LABELS[run.status] ?? run.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right text-muted-foreground">
+                            {formatDate(run.started_at)}
+                          </TableCell>
+                          <TableCell className="max-w-xs truncate text-destructive">
+                            {run.error ?? "—"}
+                          </TableCell>
+                        </TableRow>
+                      ))}
                   </TableBody>
                 </Table>
               ) : (

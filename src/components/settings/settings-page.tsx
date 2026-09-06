@@ -1,13 +1,25 @@
 import { Link } from "@tanstack/react-router";
 import { Check, Plug, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useSessionState } from "@/hooks/use-session-state";
-import { providerStatuses, type ProviderConfigStatus } from "@/lib/config.server";
+import { providerStatusesFn } from "@/lib/api/console.functions";
 
-const CATEGORY_LABELS: Record<ProviderConfigStatus["category"], string> = {
+type ProviderConfigStatus = {
+  provider: string;
+  category: string;
+  label: string;
+  configured: boolean;
+  requires: string[];
+  present: string[];
+  detail: string;
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
   visibility: "AI Visibility",
   ai: "AI",
   payments: "Payments",
@@ -25,9 +37,7 @@ function ProviderCard({ status }: { status: ProviderConfigStatus }) {
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
         <div>
           <CardTitle className="text-base">{status.label}</CardTitle>
-          <CardDescription>
-            {CATEGORY_LABELS[status.category]} · {status.provider}
-          </CardDescription>
+          <CardDescription>{status.provider}</CardDescription>
         </div>
         {status.configured ? (
           <Badge className="shrink-0">
@@ -67,7 +77,26 @@ function ProviderCard({ status }: { status: ProviderConfigStatus }) {
 
 export function SettingsPage() {
   const session = useSessionState();
-  const statuses: ProviderConfigStatus[] = providerStatuses();
+  const [statuses, setStatuses] = useState<ProviderConfigStatus[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await providerStatusesFn();
+      setStatuses(result.statuses);
+    } catch {
+      setStatuses([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (session.status !== "signed-in") return;
+    void load();
+  }, [session.status, load]);
+
   const configuredCount = statuses.filter((status) => status.configured).length;
 
   if (session.status === "signed-out") {
@@ -90,8 +119,40 @@ export function SettingsPage() {
     );
   }
 
+  if (loading && statuses.length === 0) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-full" />
+        <div className="grid gap-4 md:grid-cols-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} className="h-32 w-full" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const CATEGORY_ORDER = [
+    "visibility",
+    "ai",
+    "payments",
+    "discovery",
+    "storage",
+    "cache",
+    "observability",
+    "workflow",
+  ];
+  const grouped = CATEGORY_ORDER.map((category) => ({
+    category,
+    items: statuses.filter((status) => status.category === category),
+  })).filter((group) => group.items.length > 0);
+  const remaining = statuses.filter((status) => !CATEGORY_ORDER.includes(status.category));
+  if (remaining.length > 0) {
+    grouped.push({ category: "other", items: remaining });
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center gap-2 rounded-md border border-dashed p-3 text-xs text-muted-foreground">
         <Plug className="mt-0.5 size-3.5 shrink-0" />
         <span>
@@ -100,11 +161,18 @@ export function SettingsPage() {
           writes secrets.
         </span>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        {statuses.map((status) => (
-          <ProviderCard key={status.provider} status={status} />
-        ))}
-      </div>
+      {grouped.map((group) => (
+        <section key={group.category} className="space-y-3">
+          <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+            {CATEGORY_LABELS[group.category] ?? group.category}
+          </h3>
+          <div className="grid gap-4 md:grid-cols-2">
+            {group.items.map((status) => (
+              <ProviderCard key={status.provider} status={status} />
+            ))}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }

@@ -1,5 +1,13 @@
 import { Link } from "@tanstack/react-router";
-import { Compass, Eye, ShoppingCart, Store, TriangleAlert, Webhook } from "lucide-react";
+import {
+  AlertCircle,
+  Compass,
+  Eye,
+  ShoppingCart,
+  Store,
+  TriangleAlert,
+  Webhook,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { consoleOverviewFn } from "@/lib/api/console.functions";
@@ -147,6 +155,58 @@ function DashboardLoading() {
   );
 }
 
+function NeedsAttention({ snapshot }: { snapshot: Snapshot }) {
+  const { counts, workflows } = snapshot;
+  const failedWorkflows = workflows.filter((w) => w.status === "failed");
+
+  const items: { label: string; count: number; to: string }[] = [];
+  if (counts.pendingContent > 0) {
+    items.push({
+      label: "Happenings awaiting review",
+      count: counts.pendingContent,
+      to: "/happenings?status=in_review",
+    });
+  }
+  if (counts.prospects > 0) {
+    items.push({
+      label: "New discovery candidates",
+      count: counts.prospects,
+      to: "/discovery",
+    });
+  }
+  if (failedWorkflows.length > 0) {
+    items.push({
+      label: "Failed workflow runs",
+      count: failedWorkflows.length,
+      to: "/system",
+    });
+  }
+
+  if (items.length === 0) return null;
+
+  return (
+    <Card className="border-amber-500/40 bg-amber-500/5">
+      <CardHeader className="pb-2">
+        <div className="flex items-center gap-2">
+          <AlertCircle className="size-4 text-amber-600" />
+          <CardTitle className="text-sm font-medium">Needs attention</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-wrap gap-2">
+          {items.map((item) => (
+            <Link key={item.to} to={item.to}>
+              <Badge variant="outline" className="cursor-pointer hover:bg-amber-500/10">
+                {item.count} {item.label}
+              </Badge>
+            </Link>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function DashboardReady({ snapshot }: { snapshot: Snapshot }) {
   const { counts, avgVisibility, gmvCents, mrrCents, events } = snapshot;
   const metrics = [
@@ -166,6 +226,8 @@ function DashboardReady({ snapshot }: { snapshot: Snapshot }) {
 
   return (
     <div className="space-y-6">
+      <NeedsAttention snapshot={snapshot} />
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {metrics.map((m) => (
           <MetricCard key={m.label} label={m.label} value={m.value} hint={m.hint} />

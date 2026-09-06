@@ -163,7 +163,8 @@ function liveAdapter(baseUrl: string, apiKey: string): VisibilityAdapterHandle {
         mode: "live",
         provider: "mercercroft",
         externalId: data.id ?? null,
-        status: data.status === "failed" ? "failed" : data.status === "running" ? "running" : "succeeded",
+        status:
+          data.status === "failed" ? "failed" : data.status === "running" ? "running" : "succeeded",
         systemVersion: data.system_version ?? VISIBILITY_API_VERSION,
         metrics: data.metrics ?? {},
         warnings: data.warnings ?? [],
@@ -185,7 +186,9 @@ function liveAdapter(baseUrl: string, apiKey: string): VisibilityAdapterHandle {
   };
 }
 
-function normaliseSentiment(value: string | null | undefined): "positive" | "neutral" | "negative" | null {
+function normaliseSentiment(
+  value: string | null | undefined,
+): "positive" | "neutral" | "negative" | null {
   if (value === "positive" || value === "neutral" || value === "negative") return value;
   return null;
 }
@@ -215,7 +218,7 @@ function localAdapter(reason: string): VisibilityAdapterHandle {
       const results: VisibilityResultRow[] = [];
       for (const engine of request.engines) {
         for (const [index, prompt] of request.prompts.entries()) {
-          const spread = ((hash(`${engine.engine}:${prompt.prompt}`) % 17) - 8);
+          const spread = (hash(`${engine.engine}:${prompt.prompt}`) % 17) - 8;
           const score = clamp(base + spread, 0, 100);
           results.push({
             queryId: prompt.id,
@@ -229,7 +232,9 @@ function localAdapter(reason: string): VisibilityAdapterHandle {
             sentiment: score >= 70 ? "positive" : score >= 45 ? "neutral" : null,
             factualAccuracy: c.dataQuality,
             answerExcerpt: null,
-            citations: c.website ? [{ url: `https://${c.website}`, title: `${request.merchantName} — official site` }] : [],
+            citations: c.website
+              ? [{ url: `https://${c.website}`, title: `${request.merchantName} — official site` }]
+              : [],
             mentionedEntities: [request.merchantName],
             costUsd: 0,
             raw: {
@@ -251,7 +256,9 @@ function localAdapter(reason: string): VisibilityAdapterHandle {
         metrics: {
           queries: request.prompts.length,
           engines: request.engines.length,
-          avg_score: results.length ? round(results.reduce((s, r) => s + r.score, 0) / results.length) : 0,
+          avg_score: results.length
+            ? round(results.reduce((s, r) => s + r.score, 0) / results.length)
+            : 0,
         },
         warnings: [
           "MercerCroft is not configured. These rows are a local readiness estimate derived from your own data, not AI engine answers.",
@@ -288,5 +295,16 @@ export function visibilityAdapter(): VisibilityAdapterHandle {
   if (baseUrl && apiKey) return liveAdapter(baseUrl, apiKey);
   return localAdapter(
     `Not connected — add ${MERCERCROFT_ENV.baseUrl} and ${MERCERCROFT_ENV.apiKey} in Project Settings → Secrets. Runs use the local readiness estimator and are labelled as such.`,
+  );
+}
+
+/**
+ * Force the local readiness estimator. Never dials an external AI provider:
+ * results are computed from the merchant's canonical data and are persisted as
+ * `mode: "mock"` rows so the UI always labels them truthfully.
+ */
+export function mockVisibilityAdapter(): VisibilityAdapterHandle {
+  return localAdapter(
+    "Local readiness estimator. No external AI provider was called — results are computed from canonical data and labelled as such.",
   );
 }
