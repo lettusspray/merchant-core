@@ -949,7 +949,7 @@ export function MerchantDetailPage({ merchantId }: { merchantId: string }) {
             </TabsList>
           </div>
           <TabsContent value="overview" className="mt-4">
-            <OverviewTab detail={detail} />
+            <OverviewTab detail={detail} onSaved={load} />
           </TabsContent>
           <TabsContent value="locations" className="mt-4">
             <LocationsTab detail={detail} />
