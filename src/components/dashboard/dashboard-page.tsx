@@ -1,10 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { Compass, Eye, ShoppingCart, Store, Webhook } from "lucide-react";
+import { Compass, Eye, ShoppingCart, Store, TriangleAlert, Webhook } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { consoleOverviewFn } from "@/lib/api/console.functions";
 import { useSessionState } from "@/hooks/use-session-state";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -72,7 +73,7 @@ function AwaitingSessionView() {
       <Card className="border-dashed">
         <CardHeader>
           <div className="flex items-center gap-2">
-            <CardTitle className="text-base">Console scaffold ready</CardTitle>
+            <CardTitle className="text-base">Sign in to load the dashboard</CardTitle>
             <Badge variant="secondary">awaiting session</Badge>
           </div>
           <CardDescription>
@@ -80,6 +81,11 @@ function AwaitingSessionView() {
             healthy, navigable scaffold of the operator console.
           </CardDescription>
         </CardHeader>
+        <CardContent>
+          <Button asChild>
+            <Link to="/signin">Sign in</Link>
+          </Button>
+        </CardContent>
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -98,6 +104,29 @@ function AwaitingSessionView() {
         ))}
       </div>
     </div>
+  );
+}
+
+function DashboardError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <Card className="border-destructive/40">
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <TriangleAlert className="size-5 text-destructive" />
+          <CardTitle className="text-base">Could not load dashboard data</CardTitle>
+        </div>
+        <CardDescription>
+          You are signed in, but the workspace could not be loaded. This may mean no workspace
+          membership exists for this account, or the Supabase environment is not configured.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-xs text-muted-foreground">{message}</p>
+        <Button size="sm" variant="outline" onClick={onRetry}>
+          Try again
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -218,8 +247,12 @@ export function DashboardPage() {
     return <DashboardLoading />;
   }
 
-  if (session.status === "signed-out" || error) {
+  if (session.status === "signed-out") {
     return <AwaitingSessionView />;
+  }
+
+  if (error) {
+    return <DashboardError message={error} onRetry={() => void load()} />;
   }
 
   if (!snapshot) {

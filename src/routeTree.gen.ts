@@ -15,6 +15,7 @@ import { Route as DiscoveryRouteImport } from './routes/discovery'
 import { Route as HappeningsRouteImport } from './routes/happenings'
 import { Route as MerchantsRouteImport } from './routes/merchants'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SigninRouteImport } from './routes/signin'
 import { Route as SystemRouteImport } from './routes/system'
 import { Route as VisibilityRouteImport } from './routes/visibility'
 
@@ -48,6 +49,11 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SigninRoute = SigninRouteImport.update({
+  id: '/signin',
+  path: '/signin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SystemRoute = SystemRouteImport.update({
   id: '/system',
   path: '/system',
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/happenings': typeof HappeningsRoute
   '/merchants': typeof MerchantsRoute
   '/settings': typeof SettingsRoute
+  '/signin': typeof SigninRoute
   '/system': typeof SystemRoute
   '/visibility': typeof VisibilityRoute
 }
@@ -76,6 +83,7 @@ export interface FileRoutesByTo {
   '/happenings': typeof HappeningsRoute
   '/merchants': typeof MerchantsRoute
   '/settings': typeof SettingsRoute
+  '/signin': typeof SigninRoute
   '/system': typeof SystemRoute
   '/visibility': typeof VisibilityRoute
 }
@@ -87,6 +95,7 @@ export interface FileRoutesById {
   '/happenings': typeof HappeningsRoute
   '/merchants': typeof MerchantsRoute
   '/settings': typeof SettingsRoute
+  '/signin': typeof SigninRoute
   '/system': typeof SystemRoute
   '/visibility': typeof VisibilityRoute
 }
@@ -99,6 +108,7 @@ export interface FileRouteTypes {
     | '/happenings'
     | '/merchants'
     | '/settings'
+    | '/signin'
     | '/system'
     | '/visibility'
   fileRoutesByTo: FileRoutesByTo
@@ -109,6 +119,7 @@ export interface FileRouteTypes {
     | '/happenings'
     | '/merchants'
     | '/settings'
+    | '/signin'
     | '/system'
     | '/visibility'
   id:
@@ -119,6 +130,7 @@ export interface FileRouteTypes {
     | '/happenings'
     | '/merchants'
     | '/settings'
+    | '/signin'
     | '/system'
     | '/visibility'
   fileRoutesById: FileRoutesById
@@ -130,6 +142,7 @@ export interface RootRouteChildren {
   HappeningsRoute: typeof HappeningsRoute
   MerchantsRoute: typeof MerchantsRoute
   SettingsRoute: typeof SettingsRoute
+  SigninRoute: typeof SigninRoute
   SystemRoute: typeof SystemRoute
   VisibilityRoute: typeof VisibilityRoute
 }
@@ -178,6 +191,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/signin': {
+      id: '/signin'
+      path: '/signin'
+      fullPath: '/signin'
+      preLoaderRoute: typeof SigninRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/system': {
       id: '/system'
       path: '/system'
@@ -202,6 +222,7 @@ const rootRouteChildren: RootRouteChildren = {
   HappeningsRoute: HappeningsRoute,
   MerchantsRoute: MerchantsRoute,
   SettingsRoute: SettingsRoute,
+  SigninRoute: SigninRoute,
   SystemRoute: SystemRoute,
   VisibilityRoute: VisibilityRoute,
 }

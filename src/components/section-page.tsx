@@ -1,8 +1,10 @@
 import type { ComponentType } from "react";
+import { Link } from "@tanstack/react-router";
 
 import { useSessionState } from "@/hooks/use-session-state";
 import { SectionEmpty } from "@/components/section-empty";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 type SectionPageProps = {
@@ -23,6 +25,9 @@ export function SectionPage({ icon: Icon, title, description }: SectionPageProps
           <p className="text-sm text-muted-foreground">
             Sign in to load this surface with your workspace data.
           </p>
+          <Button asChild size="sm" className="mt-2">
+            <Link to="/signin">Sign in</Link>
+          </Button>
         </SectionEmpty>
       ) : (
         <Card className="border-dashed">

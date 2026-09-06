@@ -1,20 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Store } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
-import { SectionPage } from "@/components/section-page";
+import { MerchantsPage } from "@/components/merchants/merchants-page";
 
 export const Route = createFileRoute("/merchants")({
   component: Merchants,
 });
 
-const DESCRIPTION =
-  "Browse, manage, and enrich every merchant record in the canonical graph — identities, locations, products, sources and observations.";
-
 function Merchants() {
   return (
     <AppShell title="Merchants">
-      <SectionPage icon={Store} title="Merchants" description={DESCRIPTION} />
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Merchants</h2>
+          <p className="text-sm text-muted-foreground">
+            Every record in the canonical graph — identities, locations, and enrichment.
+          </p>
+        </div>
+        <MerchantsPage />
+      </div>
     </AppShell>
   );
 }

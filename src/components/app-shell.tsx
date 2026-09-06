@@ -4,13 +4,16 @@ import {
   Compass,
   Eye,
   LayoutDashboard,
+  LogOut,
   Settings,
   ShoppingCart,
   Store,
   Webhook,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
 
+import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -28,6 +31,9 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
+import { useSessionState } from "@/hooks/use-session-state";
+import { supabase } from "@/integrations/supabase/client";
+import { workspaceSummaryFn } from "@/lib/api/console.functions";
 
 type NavItem = {
   href: string;
@@ -97,10 +103,74 @@ function SidebarNav() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <div className="px-2 py-1 text-xs text-muted-foreground">Merchant Core preview</div>
+        <ShellFooter />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
+  );
+}
+
+function ShellFooter() {
+  const session = useSessionState();
+  const [workspace, setWorkspace] = useState<{ name: string; role: string } | null>(null);
+
+  useEffect(() => {
+    if (session.status !== "signed-in") {
+      setWorkspace(null);
+      return;
+    }
+    let active = true;
+    void workspaceSummaryFn()
+      .then((result) => {
+        if (!active) return;
+        setWorkspace({ name: result.tenantName, role: result.workspaceRole });
+      })
+      .catch(() => {
+        if (!active) return;
+        setWorkspace(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [session.status]);
+
+  if (session.status !== "signed-in") {
+    return (
+      <SidebarFooter>
+        <div className="flex items-center justify-between gap-2 px-2 py-1">
+          <span className="text-xs text-muted-foreground">Not signed in</span>
+          <Button asChild size="sm" variant="outline">
+            <Link to="/signin">Sign in</Link>
+          </Button>
+        </div>
+      </SidebarFooter>
+    );
+  }
+
+  return (
+    <SidebarFooter>
+      <div className="space-y-2 px-2 py-1">
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate text-xs font-medium">
+              {workspace?.name ?? "Loading workspace…"}
+            </p>
+            <p className="truncate text-[11px] text-muted-foreground">
+              {workspace?.role ?? "…"} workspace
+            </p>
+          </div>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-7 shrink-0"
+            aria-label="Sign out"
+            onClick={() => void supabase.auth.signOut()}
+          >
+            <LogOut className="size-3.5" />
+          </Button>
+        </div>
+      </div>
+    </SidebarFooter>
   );
 }
 
