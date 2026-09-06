@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { providerStatuses, type ProviderConfigStatus } from "@/lib/config.server";
@@ -8,6 +9,8 @@ import {
   discoveryCandidates,
   happeningsList,
   listWorkspaces,
+  MERCHANT_STATUSES,
+  MERCHANT_VERTICALS,
   merchantDetail,
   merchantList,
   ordersList,
@@ -16,10 +19,63 @@ import {
   resolveTenant,
   runMockVisibility,
   systemActivity,
+  tenantCategories,
   updateHappeningStatus,
+  updateMerchantIdentity,
   visibilityRuns,
   visibilitySnapshots,
 } from "./console.server";
+
+const optionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .transform((value) => (value.length === 0 ? null : value))
+    .nullable()
+    .optional()
+    .transform((value) => value ?? null);
+
+const merchantIdentitySchema = z.object({
+  merchantId: z.string().uuid(),
+  name: z.string().trim().min(2, "Name must be at least 2 characters.").max(160),
+  slug: z
+    .string()
+    .trim()
+    .min(2, "Slug must be at least 2 characters.")
+    .max(80)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use lowercase letters, numbers and single hyphens."),
+  vertical: z.enum(MERCHANT_VERTICALS),
+  status: z.enum(MERCHANT_STATUSES),
+  tagline: optionalText(200),
+  description: optionalText(4000),
+  brand_color: z
+    .string()
+    .trim()
+    .regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, "Use a hex color such as #1F6FEB.")
+    .nullable()
+    .optional()
+    .or(z.literal(""))
+    .transform((value) => (value ? value : null)),
+  logo_url: z
+    .string()
+    .trim()
+    .url("Logo must be a valid URL.")
+    .nullable()
+    .optional()
+    .or(z.literal(""))
+    .transform((value) => (value ? value : null)),
+  primary_category_id: z
+    .string()
+    .uuid()
+    .nullable()
+    .optional()
+    .or(z.literal(""))
+    .transform((value) => (value ? value : null)),
+});
+
+export type MerchantIdentityFormInput = z.input<typeof merchantIdentitySchema>;
+
 
 export const consoleOverviewFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
