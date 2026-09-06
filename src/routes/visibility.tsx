@@ -1,20 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Eye } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
-import { SectionPage } from "@/components/section-page";
+import { VisibilityPage } from "@/components/visibility/visibility-page";
 
 export const Route = createFileRoute("/visibility")({
   component: Visibility,
 });
 
-const DESCRIPTION =
-  "AI visibility results — dispatch runs against MercerCroft, track queries and per-engine citation and rank outcomes.";
-
 function Visibility() {
   return (
     <AppShell title="AI Visibility">
-      <SectionPage icon={Eye} title="AI Visibility" description={DESCRIPTION} />
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">AI Visibility</h2>
+          <p className="text-sm text-muted-foreground">
+            Visibility runs and scores against AI engines — status, mode, and persisted results for
+            each merchant.
+          </p>
+        </div>
+        <VisibilityPage />
+      </div>
     </AppShell>
   );
 }

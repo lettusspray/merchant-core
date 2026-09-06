@@ -1,20 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Webhook } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
-import { SectionPage } from "@/components/section-page";
+import { HappeningsPage } from "@/components/happenings/happenings-page";
 
 export const Route = createFileRoute("/happenings")({
   component: Happenings,
 });
 
-const DESCRIPTION =
-  "Content and updates engine — ingest current happenings, review candidate content, approve and queue publications.";
-
 function Happenings() {
   return (
     <AppShell title="Happenings">
-      <SectionPage icon={Webhook} title="Happenings" description={DESCRIPTION} />
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Happenings</h2>
+          <p className="text-sm text-muted-foreground">
+            Events, promotions, and announcements ingested for your merchants — review candidates
+            and their evidence.
+          </p>
+        </div>
+        <HappeningsPage />
+      </div>
     </AppShell>
   );
 }

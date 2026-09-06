@@ -1,20 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Settings } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
-import { SectionPage } from "@/components/section-page";
+import { SettingsPage } from "@/components/settings/settings-page";
 
 export const Route = createFileRoute("/settings")({
-  component: SettingsPage,
+  component: Settings,
 });
 
-const DESCRIPTION =
-  "Workspace settings — memberships, roles, integrations, source connectors and provider configuration.";
-
-function SettingsPage() {
+function Settings() {
   return (
     <AppShell title="Settings">
-      <SectionPage icon={Settings} title="Settings" description={DESCRIPTION} />
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
+          <p className="text-sm text-muted-foreground">
+            Operator view of integration readiness and provider configuration.
+          </p>
+        </div>
+        <SettingsPage />
+      </div>
     </AppShell>
   );
 }

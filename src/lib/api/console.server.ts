@@ -161,7 +161,7 @@ export async function merchantList(
 export async function discoveryCandidates(
   supabase: Db,
   tenantId: string,
-  filters: { search?: string },
+  filters: { search?: string; status?: string },
 ) {
   let query = supabase
     .from("discovery_candidates")
@@ -170,9 +170,96 @@ export async function discoveryCandidates(
     .order("score", { ascending: false })
     .order("updated_at", { ascending: false });
   if (filters.search) query = query.ilike("name", `%${filters.search}%`);
+  if (filters.status) query = query.eq("status", filters.status as never);
   const { data, error } = await query;
   if (error) throw error;
   return data ?? [];
+}
+
+export async function happeningsList(
+  supabase: Db,
+  tenantId: string,
+  filters: { search?: string; status?: string },
+) {
+  let query = supabase
+    .from("happenings")
+    .select("*, merchants(name, slug)")
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false });
+  if (filters.search) query = query.ilike("title", `%${filters.search}%`);
+  if (filters.status) query = query.eq("status", filters.status as never);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function visibilityRuns(supabase: Db, tenantId: string, merchantId?: string) {
+  let query = supabase
+    .from("visibility_runs")
+    .select("*, merchants(name)")
+    .eq("tenant_id", tenantId)
+    .order("started_at", { ascending: false });
+  if (merchantId) query = query.eq("merchant_id", merchantId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function visibilitySnapshots(
+  supabase: Db,
+  tenantId: string,
+  opts: { runId?: string; limit?: number },
+) {
+  let query = supabase
+    .from("visibility_snapshots")
+    .select("*, merchants(name)")
+    .eq("tenant_id", tenantId)
+    .order("captured_at", { ascending: false });
+  if (opts.runId) query = query.eq("run_id", opts.runId);
+  if (opts.limit) query = query.limit(opts.limit);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function ordersList(supabase: Db, tenantId: string, limit = 100) {
+  const [orders, subscriptions] = await Promise.all([
+    supabase
+      .from("orders")
+      .select("*, merchants(name)")
+      .eq("tenant_id", tenantId)
+      .order("placed_at", { ascending: false })
+      .limit(limit),
+    supabase
+      .from("subscriptions")
+      .select("*, merchants(name)")
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false })
+      .limit(limit),
+  ]);
+  if (orders.error) throw orders.error;
+  if (subscriptions.error) throw subscriptions.error;
+  return { orders: orders.data ?? [], subscriptions: subscriptions.data ?? [] };
+}
+
+export async function systemActivity(supabase: Db, tenantId: string, limit = 50) {
+  const [events, workflows] = await Promise.all([
+    supabase
+      .from("events")
+      .select("id, kind, actor_label, subject_type, subject_id, created_at, payload")
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false })
+      .limit(limit),
+    supabase
+      .from("workflow_runs")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .order("started_at", { ascending: false })
+      .limit(limit),
+  ]);
+  if (events.error) throw events.error;
+  if (workflows.error) throw workflows.error;
+  return { events: events.data ?? [], workflows: workflows.data ?? [] };
 }
 
 export async function merchantDetail(supabase: Db, tenantId: string, merchantId: string) {

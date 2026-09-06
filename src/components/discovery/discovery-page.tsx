@@ -17,6 +17,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -287,6 +294,7 @@ function CandidateRow({
 export function DiscoveryPage() {
   const session = useSessionState();
   const [searchInput, setSearchInput] = useState("");
+  const [status, setStatus] = useState<string>("all");
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -296,8 +304,9 @@ export function DiscoveryPage() {
     setLoading(true);
     setError(null);
     try {
-      const data: { q?: string } = {};
+      const data: { q?: string; status?: string } = {};
       if (searchInput.trim()) data.q = searchInput.trim();
+      if (status !== "all") data.status = status;
       const result = await discoveryCandidatesFn({ data });
       setCandidates(result.candidates);
     } catch (err) {
@@ -306,7 +315,7 @@ export function DiscoveryPage() {
     } finally {
       setLoading(false);
     }
-  }, [searchInput]);
+  }, [searchInput, status]);
 
   useEffect(() => {
     if (session.status !== "signed-in") return;
@@ -314,10 +323,11 @@ export function DiscoveryPage() {
     return () => clearTimeout(timer);
   }, [session.status, load]);
 
-  const hasSearch = searchInput.trim() !== "";
+  const hasFilters = searchInput.trim() !== "" || status !== "all";
 
-  const resetSearch = () => {
+  const resetFilters = () => {
     setSearchInput("");
+    setStatus("all");
     void load();
   };
 
@@ -368,8 +378,24 @@ export function DiscoveryPage() {
             className="pl-8"
           />
         </div>
-        {hasSearch ? (
-          <Button size="sm" variant="ghost" onClick={resetSearch}>
+        <Select
+          value={status}
+          onValueChange={(value) => setStatus(value === "all" ? "all" : value)}
+        >
+          <SelectTrigger className="w-full sm:w-40">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {STATUS_VALUES.map((value) => (
+              <SelectItem key={value} value={value}>
+                {STATUS_LABELS[value]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {hasFilters ? (
+          <Button size="sm" variant="ghost" onClick={resetFilters}>
             <FilterX className="size-4" />
             Clear
           </Button>
@@ -377,7 +403,7 @@ export function DiscoveryPage() {
       </div>
 
       {empty ? (
-        <DiscoveryEmptyState hasSearch={hasSearch} onReset={resetSearch} />
+        <DiscoveryEmptyState hasSearch={hasFilters} onReset={resetFilters} />
       ) : (
         <Card>
           <CardContent className="p-0">

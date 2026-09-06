@@ -1,20 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Activity } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
-import { SectionPage } from "@/components/section-page";
+import { SystemPage } from "@/components/system/system-page";
 
 export const Route = createFileRoute("/system")({
   component: System,
 });
 
-const DESCRIPTION =
-  "System health and activity — provider status, background workflows, and the audit trail for privileged changes.";
-
 function System() {
   return (
     <AppShell title="System">
-      <SectionPage icon={Activity} title="System" description={DESCRIPTION} />
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">System</h2>
+          <p className="text-sm text-muted-foreground">
+            Provider health, the audit trail of business events, and background workflow runs.
+          </p>
+        </div>
+        <SystemPage />
+      </div>
     </AppShell>
   );
 }
