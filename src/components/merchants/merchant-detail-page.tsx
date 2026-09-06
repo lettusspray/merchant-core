@@ -21,6 +21,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { EditIdentityDialog } from "@/components/merchants/edit-identity-dialog";
 import { EditLocationDialog } from "@/components/merchants/edit-location-dialog";
+import { EditCatalogDialog } from "@/components/merchants/edit-catalog-dialog";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -383,13 +384,28 @@ function LocationsTab({
   );
 }
 
-function ProductsTab({ detail }: { detail: Detail }) {
+function ProductsTab({ detail, onSaved }: { detail: Detail; onSaved: () => void | Promise<void> }) {
   const products = detail.products ?? [];
+  const [saved, setSaved] = useState(false);
+
+  const handleSaved = async () => {
+    await onSaved();
+    setSaved(true);
+  };
 
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Products</CardTitle>
+      <CardHeader className="flex-row items-center justify-between gap-3 pb-2">
+        <div className="space-y-1">
+          <CardTitle className="text-base">Products</CardTitle>
+          {saved ? (
+            <p className="flex items-center gap-1 text-xs font-medium text-emerald-600">
+              <CheckCircle2 className="size-3.5" />
+              Catalog saved and recorded in the event log.
+            </p>
+          ) : null}
+        </div>
+        <EditCatalogDialog merchantId={detail.merchant.id} kind="product" onSaved={handleSaved} />
       </CardHeader>
       <CardContent className="p-0">
         {products.length === 0 ? (
@@ -405,6 +421,7 @@ function ProductsTab({ detail }: { detail: Detail }) {
                 <TableHead>Price</TableHead>
                 <TableHead>Currency</TableHead>
                 <TableHead>State</TableHead>
+                <TableHead className="w-12" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -424,6 +441,14 @@ function ProductsTab({ detail }: { detail: Detail }) {
                   <TableCell>
                     <Badge variant="outline">{product.state}</Badge>
                   </TableCell>
+                  <TableCell className="text-right">
+                    <EditCatalogDialog
+                      merchantId={detail.merchant.id}
+                      kind="product"
+                      item={product}
+                      onSaved={handleSaved}
+                    />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -434,13 +459,28 @@ function ProductsTab({ detail }: { detail: Detail }) {
   );
 }
 
-function ServicesTab({ detail }: { detail: Detail }) {
+function ServicesTab({ detail, onSaved }: { detail: Detail; onSaved: () => void | Promise<void> }) {
   const services = detail.services ?? [];
+  const [saved, setSaved] = useState(false);
+
+  const handleSaved = async () => {
+    await onSaved();
+    setSaved(true);
+  };
 
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base">Services</CardTitle>
+      <CardHeader className="flex-row items-center justify-between gap-3 pb-2">
+        <div className="space-y-1">
+          <CardTitle className="text-base">Services</CardTitle>
+          {saved ? (
+            <p className="flex items-center gap-1 text-xs font-medium text-emerald-600">
+              <CheckCircle2 className="size-3.5" />
+              Catalog saved and recorded in the event log.
+            </p>
+          ) : null}
+        </div>
+        <EditCatalogDialog merchantId={detail.merchant.id} kind="service" onSaved={handleSaved} />
       </CardHeader>
       <CardContent className="p-0">
         {services.length === 0 ? (
@@ -456,6 +496,7 @@ function ServicesTab({ detail }: { detail: Detail }) {
                 <TableHead>Price</TableHead>
                 <TableHead>Duration</TableHead>
                 <TableHead>State</TableHead>
+                <TableHead className="w-12" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -469,6 +510,14 @@ function ServicesTab({ detail }: { detail: Detail }) {
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline">{service.state}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <EditCatalogDialog
+                      merchantId={detail.merchant.id}
+                      kind="service"
+                      item={service}
+                      onSaved={handleSaved}
+                    />
                   </TableCell>
                 </TableRow>
               ))}
@@ -993,8 +1042,8 @@ export function MerchantDetailPage({ merchantId }: { merchantId: string }) {
           </TabsContent>
           <TabsContent value="products" className="mt-4">
             <div className="space-y-4">
-              <ProductsTab detail={detail} />
-              <ServicesTab detail={detail} />
+              <ProductsTab detail={detail} onSaved={refresh} />
+              <ServicesTab detail={detail} onSaved={refresh} />
               <OffersTab detail={detail} />
             </div>
           </TabsContent>

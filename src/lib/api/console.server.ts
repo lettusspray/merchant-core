@@ -529,6 +529,111 @@ export async function upsertLocation(
   return { location: data, created: true };
 }
 
+export const PUBLISH_STATES = ["draft", "published", "archived"] as const;
+export type PublishState = (typeof PUBLISH_STATES)[number];
+
+export type CatalogItemInput =
+  | {
+      kind: "product";
+      name: string;
+      description: string | null;
+      price_cents: number | null;
+      state: PublishState;
+      sku: string | null;
+      currency: string;
+    }
+  | {
+      kind: "service";
+      name: string;
+      description: string | null;
+      price_cents: number | null;
+      state: PublishState;
+      duration_minutes: number | null;
+    };
+
+/** Creates or updates a product or service in the merchant's catalog. Tenant
+ *  scope is enforced server-side and again by RLS; the client never supplies a
+ *  tenant id. */
+export async function upsertCatalogItem(
+  supabase: Db,
+  tenantId: string,
+  merchantId: string,
+  itemId: string | null,
+  input: CatalogItemInput,
+) {
+  const { data: merchant, error: merchantError } = await supabase
+    .from("merchants")
+    .select("id, name")
+    .eq("tenant_id", tenantId)
+    .eq("id", merchantId)
+    .maybeSingle();
+  if (merchantError) throw merchantError;
+  if (!merchant) throw new Error("Merchant not found");
+
+  const updatedAt = new Date().toISOString();
+
+  if (input.kind === "product") {
+    const payload = {
+      name: input.name,
+      description: input.description,
+      price_cents: input.price_cents,
+      sku: input.sku,
+      currency: input.currency,
+      state: input.state,
+      updated_at: updatedAt,
+    };
+    if (itemId) {
+      const { data, error } = await supabase
+        .from("products")
+        .update(payload)
+        .eq("tenant_id", tenantId)
+        .eq("merchant_id", merchantId)
+        .eq("id", itemId)
+        .select("*")
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error("Product not found");
+      return { item: data, created: false };
+    }
+    const { data, error } = await supabase
+      .from("products")
+      .insert({ tenant_id: tenantId, merchant_id: merchantId, ...payload })
+      .select("*")
+      .single();
+    if (error) throw error;
+    return { item: data, created: true };
+  }
+
+  const payload = {
+    name: input.name,
+    description: input.description,
+    price_cents: input.price_cents,
+    duration_minutes: input.duration_minutes,
+    state: input.state,
+    updated_at: updatedAt,
+  };
+  if (itemId) {
+    const { data, error } = await supabase
+      .from("services")
+      .update(payload)
+      .eq("tenant_id", tenantId)
+      .eq("merchant_id", merchantId)
+      .eq("id", itemId)
+      .select("*")
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error("Service not found");
+    return { item: data, created: false };
+  }
+  const { data, error } = await supabase
+    .from("services")
+    .insert({ tenant_id: tenantId, merchant_id: merchantId, ...payload })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return { item: data, created: true };
+}
+
 function slugify(name: string): string {
   return name
     .toLowerCase()

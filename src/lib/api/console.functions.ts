@@ -15,6 +15,7 @@ import {
   merchantList,
   ordersList,
   promoteCandidate,
+  PUBLISH_STATES,
   recordEvent,
   resolveTenant,
   runMockVisibility,
@@ -22,6 +23,7 @@ import {
   tenantCategories,
   updateHappeningStatus,
   updateMerchantIdentity,
+  upsertCatalogItem,
   upsertLocation,
   visibilityRuns,
   visibilitySnapshots,
@@ -90,6 +92,56 @@ const locationSchema = z.object({
   phone: optionalText(40),
   is_primary: z.boolean(),
 });
+
+const catalogItemSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("product"),
+    merchantId: z.string().uuid(),
+    itemId: z.string().uuid().nullable().optional(),
+    name: z.string().trim().min(2, "Name must be at least 2 characters.").max(160),
+    description: optionalText(2000),
+    sku: optionalText(80),
+    currency: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .regex(/^[a-z]{3}$/, "Currency must be a 3-letter code such as usd.")
+      .default("usd"),
+    price_cents: z
+      .number()
+      .int("Price must be a whole number of cents.")
+      .min(0)
+      .max(999999999)
+      .nullable()
+      .optional()
+      .transform((value) => value ?? null),
+    state: z.enum(PUBLISH_STATES),
+  }),
+  z.object({
+    kind: z.literal("service"),
+    merchantId: z.string().uuid(),
+    itemId: z.string().uuid().nullable().optional(),
+    name: z.string().trim().min(2, "Name must be at least 2 characters.").max(160),
+    description: optionalText(2000),
+    price_cents: z
+      .number()
+      .int("Price must be a whole number of cents.")
+      .min(0)
+      .max(999999999)
+      .nullable()
+      .optional()
+      .transform((value) => value ?? null),
+    duration_minutes: z
+      .number()
+      .int()
+      .min(0)
+      .max(100000)
+      .nullable()
+      .optional()
+      .transform((value) => value ?? null),
+    state: z.enum(PUBLISH_STATES),
+  }),
+]);
 
 export const consoleOverviewFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -194,6 +246,26 @@ export const upsertLocationFn = createServerFn({ method: "POST" })
       payload: { locationId: result.location.id, fields },
     });
     return { location: result.location, created: result.created };
+  });
+
+export const upsertCatalogItemFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => catalogItemSchema.parse(input))
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    const { merchantId, itemId, ...fields } = data;
+    const result = await upsertCatalogItem(supabase, tenantId, merchantId, itemId ?? null, fields);
+    const entity = fields.kind;
+    await recordEvent(supabase, {
+      tenantId,
+      actorId: context.userId,
+      kind: result.created ? `merchant.${entity}_created` : `merchant.${entity}_updated`,
+      subjectType: "merchant",
+      subjectId: merchantId,
+      payload: { itemId: result.item.id, fields },
+    });
+    return { item: result.item, created: result.created };
   });
 
 export const discoveryCandidatesFn = createServerFn({ method: "GET" })
