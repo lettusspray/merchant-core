@@ -22,6 +22,7 @@ import {
   tenantCategories,
   updateHappeningStatus,
   updateMerchantIdentity,
+  upsertLocation,
   visibilityRuns,
   visibilitySnapshots,
 } from "./console.server";
@@ -75,6 +76,20 @@ const merchantIdentitySchema = z.object({
 });
 
 export type MerchantIdentityFormInput = z.input<typeof merchantIdentitySchema>;
+
+const locationSchema = z.object({
+  merchantId: z.string().uuid(),
+  locationId: z.string().uuid().nullable().optional(),
+  label: z.string().trim().min(2, "Label must be at least 2 characters.").max(200),
+  address_line1: optionalText(200),
+  address_line2: optionalText(200),
+  city: optionalText(120),
+  region: optionalText(120),
+  postal_code: optionalText(20),
+  country: optionalText(80),
+  phone: optionalText(40),
+  is_primary: z.boolean(),
+});
 
 export const consoleOverviewFn = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -160,6 +175,25 @@ export const updateMerchantIdentityFn = createServerFn({ method: "POST" })
       payload: { fields },
     });
     return { merchant };
+  });
+
+export const upsertLocationFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => locationSchema.parse(input))
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    const { merchantId, locationId, ...fields } = data;
+    const result = await upsertLocation(supabase, tenantId, merchantId, locationId ?? null, fields);
+    await recordEvent(supabase, {
+      tenantId,
+      actorId: context.userId,
+      kind: result.created ? "merchant.location_created" : "merchant.location_updated",
+      subjectType: "merchant",
+      subjectId: merchantId,
+      payload: { locationId: result.location.id, fields },
+    });
+    return { location: result.location, created: result.created };
   });
 
 export const discoveryCandidatesFn = createServerFn({ method: "GET" })

@@ -452,6 +452,83 @@ export async function updateMerchantIdentity(
   return data;
 }
 
+export type LocationInput = {
+  label: string;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  region: string | null;
+  postal_code: string | null;
+  country: string | null;
+  phone: string | null;
+  is_primary: boolean;
+};
+
+/** Creates or updates a merchant location. Tenant scope is enforced server-side
+ *  and again by RLS; the client never supplies a tenant id. When a location is
+ *  marked primary, all other locations for the merchant are un-marked first so
+ *  there is always exactly one primary. */
+export async function upsertLocation(
+  supabase: Db,
+  tenantId: string,
+  merchantId: string,
+  locationId: string | null,
+  input: LocationInput,
+) {
+  const { data: merchant, error: merchantError } = await supabase
+    .from("merchants")
+    .select("id, name")
+    .eq("tenant_id", tenantId)
+    .eq("id", merchantId)
+    .maybeSingle();
+  if (merchantError) throw merchantError;
+  if (!merchant) throw new Error("Merchant not found");
+
+  const payload = {
+    label: input.label,
+    address_line1: input.address_line1,
+    address_line2: input.address_line2,
+    city: input.city,
+    region: input.region,
+    postal_code: input.postal_code,
+    country: input.country,
+    phone: input.phone,
+    is_primary: input.is_primary,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (input.is_primary) {
+    const { error: clearError } = await supabase
+      .from("locations")
+      .update({ is_primary: false, updated_at: new Date().toISOString() })
+      .eq("tenant_id", tenantId)
+      .eq("merchant_id", merchantId);
+    if (clearError) throw clearError;
+  }
+
+  if (locationId) {
+    const { data, error } = await supabase
+      .from("locations")
+      .update(payload)
+      .eq("tenant_id", tenantId)
+      .eq("merchant_id", merchantId)
+      .eq("id", locationId)
+      .select("*")
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error("Location not found");
+    return { location: data, created: false };
+  }
+
+  const { data, error } = await supabase
+    .from("locations")
+    .insert({ tenant_id: tenantId, merchant_id: merchantId, ...payload })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return { location: data, created: true };
+}
+
 function slugify(name: string): string {
   return name
     .toLowerCase()

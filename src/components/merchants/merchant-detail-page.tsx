@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import {
   ArrowLeft,
   CalendarDays,
+  CheckCircle2,
   FileText,
   Globe,
   MapPin,
@@ -19,6 +20,7 @@ import type { ComponentType, ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { EditIdentityDialog } from "@/components/merchants/edit-identity-dialog";
+import { EditLocationDialog } from "@/components/merchants/edit-location-dialog";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -223,19 +225,40 @@ function OverviewTab({ detail, onSaved }: { detail: Detail; onSaved: () => void 
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
-function LocationsTab({ detail }: { detail: Detail }) {
+function LocationsTab({
+  detail,
+  onSaved,
+}: {
+  detail: Detail;
+  onSaved: () => void | Promise<void>;
+}) {
   const locations = detail.locations ?? [];
   const contacts = detail.contacts ?? [];
   const hours = detail.hours ?? [];
+  const [saved, setSaved] = useState(false);
 
   const locationLabel = (id: string) =>
     locations.find((location) => location.id === id)?.label ?? "Unknown location";
 
+  const handleSaved = async () => {
+    await onSaved();
+    setSaved(true);
+  };
+
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Locations</CardTitle>
+        <CardHeader className="flex-row items-center justify-between gap-3 pb-2">
+          <div className="space-y-1">
+            <CardTitle className="text-base">Locations</CardTitle>
+            {saved ? (
+              <p className="flex items-center gap-1 text-xs font-medium text-emerald-600">
+                <CheckCircle2 className="size-3.5" />
+                Location saved and recorded in the event log.
+              </p>
+            ) : null}
+          </div>
+          <EditLocationDialog merchantId={detail.merchant.id} onSaved={handleSaved} />
         </CardHeader>
         <CardContent className="p-0">
           {locations.length === 0 ? (
@@ -251,6 +274,7 @@ function LocationsTab({ detail }: { detail: Detail }) {
                   <TableHead>City / Region</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead className="text-right">Primary</TableHead>
+                  <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -270,6 +294,13 @@ function LocationsTab({ detail }: { detail: Detail }) {
                     <TableCell>{location.phone ?? "—"}</TableCell>
                     <TableCell className="text-right">
                       {location.is_primary ? <Badge>Primary</Badge> : "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <EditLocationDialog
+                        merchantId={detail.merchant.id}
+                        location={location}
+                        onSaved={handleSaved}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -958,7 +989,7 @@ export function MerchantDetailPage({ merchantId }: { merchantId: string }) {
             <OverviewTab detail={detail} onSaved={refresh} />
           </TabsContent>
           <TabsContent value="locations" className="mt-4">
-            <LocationsTab detail={detail} />
+            <LocationsTab detail={detail} onSaved={refresh} />
           </TabsContent>
           <TabsContent value="products" className="mt-4">
             <div className="space-y-4">
