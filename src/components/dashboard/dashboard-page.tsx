@@ -1,8 +1,12 @@
 import { Link } from "@tanstack/react-router";
+import { format } from "date-fns";
 import {
   AlertCircle,
+  ArrowUpRight,
+  CheckCircle2,
   Compass,
   Eye,
+  RefreshCw,
   ShoppingCart,
   Store,
   TriangleAlert,
@@ -207,6 +211,109 @@ function NeedsAttention({ snapshot }: { snapshot: Snapshot }) {
   );
 }
 
+function formatRelative(value: string | null): string {
+  if (!value) return "—";
+  const diff = Date.now() - new Date(value).getTime();
+  const minutes = Math.round(diff / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return format(new Date(value), "MMM d, yyyy");
+}
+
+function AcquisitionSection({ snapshot }: { snapshot: Snapshot }) {
+  const acquisition = snapshot.acquisition;
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <MetricCard
+          label={`Discovery runs (${acquisition?.windowDays ?? 30}d)`}
+          value={String(acquisition?.runs ?? 0)}
+          hint={`${acquisition?.runsSucceeded ?? 0} succeeded`}
+        />
+        <MetricCard
+          label={`New candidates (${acquisition?.windowDays ?? 30}d)`}
+          value={String(acquisition?.newCandidates ?? 0)}
+          hint="first seen in window"
+        />
+        <MetricCard
+          label={`Refreshed (${acquisition?.windowDays ?? 30}d)`}
+          value={String(acquisition?.refreshedCandidates ?? 0)}
+          hint="re-checked from source"
+        />
+        <MetricCard
+          label="Promoted (all time)"
+          value={String(acquisition?.promotedCandidates ?? 0)}
+          hint={`${acquisition?.promotedInWindow ?? 0} in last ${acquisition?.windowDays ?? 30}d`}
+        />
+        <MetricCard
+          label="Pipeline health"
+          value={
+            acquisition?.lastRun
+              ? acquisition.lastRun.status === "failed"
+                ? "Last run failed"
+                : "Healthy"
+              : "Never ran"
+          }
+          hint={
+            acquisition?.lastRun
+              ? `${acquisition.lastRun.provider} · ${formatRelative(acquisition.lastRun.started_at)}`
+              : "no runs recorded"
+          }
+        />
+      </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center justify-between text-base">
+            <span>Acquisition activity</span>
+            <Button asChild size="sm" variant="ghost">
+              <Link to="/discovery">
+                Open discovery
+                <ArrowUpRight className="size-4" />
+              </Link>
+            </Button>
+          </CardTitle>
+          <CardDescription>Latest discovery and candidate lifecycle events</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!acquisition || acquisition.recent.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No discovery activity yet. Run a discovery pass to start onboarding new businesses.
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {acquisition.recent.map((event) => (
+                <li key={event.id} className="flex items-center justify-between gap-4 text-sm">
+                  <div className="flex min-w-0 items-center gap-2">
+                    {event.kind.includes("failed") || event.kind.includes("missing") ? (
+                      <TriangleAlert className="size-4 shrink-0 text-destructive" />
+                    ) : event.kind.includes("promoted") ? (
+                      <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
+                    ) : (
+                      <RefreshCw className="size-4 shrink-0 text-muted-foreground" />
+                    )}
+                    <span className="truncate font-medium">{event.kind}</span>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <span className="block text-xs text-muted-foreground">{event.actor_label}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {formatRelative(event.created_at)}
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function DashboardReady({ snapshot }: { snapshot: Snapshot }) {
   const { counts, avgVisibility, gmvCents, mrrCents, events } = snapshot;
   const metrics = [
@@ -233,6 +340,8 @@ function DashboardReady({ snapshot }: { snapshot: Snapshot }) {
           <MetricCard key={m.label} label={m.label} value={m.value} hint={m.hint} />
         ))}
       </div>
+
+      <AcquisitionSection snapshot={snapshot} />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>

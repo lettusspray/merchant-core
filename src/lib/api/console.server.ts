@@ -6,6 +6,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 import { mockVisibilityAdapter, type VisibilityEngine } from "@/lib/adapters/visibility.server";
+import { providerStatuses, type DiscoveryRuntimeHealth } from "@/lib/config.server";
+import { runDiscoveryPipeline, refreshCandidatePipeline } from "@/lib/discovery/pipeline.server";
+import { DISCOVERY_SOURCES, discoverySourceMeta } from "@/lib/discovery/sources";
 
 export type Db = SupabaseClient<Database>;
 
@@ -99,7 +102,7 @@ export async function dashboardSnapshot(supabase: Db, tenantId: string) {
       0,
     );
 
-  const [visibility, recentEvents, workflows] = await Promise.all([
+  const [visibility, recentEvents, workflows, acquisition] = await Promise.all([
     supabase
       .from("visibility_snapshots")
       .select("score, engine, captured_at, mentioned, merchants(name)")
@@ -118,6 +121,7 @@ export async function dashboardSnapshot(supabase: Db, tenantId: string) {
       .eq("tenant_id", tenantId)
       .order("started_at", { ascending: false })
       .limit(8),
+    acquisitionSnapshot(supabase, tenantId),
   ]);
 
   const scores = (visibility.data ?? []).map((row) => Number(row.score));
@@ -136,6 +140,83 @@ export async function dashboardSnapshot(supabase: Db, tenantId: string) {
     visibility: visibility.data ?? [],
     events: recentEvents.data ?? [],
     workflows: workflows.data ?? [],
+    acquisition,
+  };
+}
+
+const ACQUISITION_WINDOW_DAYS = 30;
+
+/** Acquisition/Discovery metrics: runs, new/refreshed/promoted candidates, recent activity. */
+async function acquisitionSnapshot(supabase: Db, tenantId: string) {
+  const windowStart = new Date(Date.now() - ACQUISITION_WINDOW_DAYS * 86400000).toISOString();
+
+  const [runs, lastRun, newCandidates, refreshed, promoted, promotedInWindow, activity] =
+    await Promise.all([
+      supabase
+        .from("discovery_jobs")
+        .select(
+          "id, provider, status, started_at, created_count, updated_count, deduped_count, failed_count",
+        )
+        .eq("tenant_id", tenantId)
+        .gte("started_at", windowStart)
+        .order("started_at", { ascending: false })
+        .limit(100),
+      supabase
+        .from("discovery_jobs")
+        .select(
+          "id, provider, query, vertical, city, region, status, started_at, finished_at, created_count, updated_count, deduped_count, failed_count, error",
+        )
+        .eq("tenant_id", tenantId)
+        .order("started_at", { ascending: false })
+        .limit(1),
+      supabase
+        .from("discovery_candidates")
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .gte("first_seen_at", windowStart),
+      supabase
+        .from("discovery_candidates")
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .gte("updated_at", windowStart)
+        .lt("first_seen_at", windowStart),
+      supabase
+        .from("discovery_candidates")
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .not("promoted_at", "is", null),
+      supabase
+        .from("discovery_candidates")
+        .select("*", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .gte("promoted_at", windowStart),
+      supabase
+        .from("events")
+        .select("id, kind, subject_type, actor_label, created_at, payload")
+        .eq("tenant_id", tenantId)
+        .or("kind.ilike.discovery.%,kind.ilike.candidate.%")
+        .order("created_at", { ascending: false })
+        .limit(6),
+    ]);
+  if (runs.error) throw runs.error;
+  if (lastRun.error) throw lastRun.error;
+  if (newCandidates.error) throw newCandidates.error;
+  if (refreshed.error) throw refreshed.error;
+  if (promoted.error) throw promoted.error;
+  if (promotedInWindow.error) throw promotedInWindow.error;
+  if (activity.error) throw activity.error;
+
+  const runRows = runs.data ?? [];
+  return {
+    windowDays: ACQUISITION_WINDOW_DAYS,
+    runs: runRows.length,
+    runsSucceeded: runRows.filter((r) => r.status === "succeeded").length,
+    newCandidates: newCandidates.count ?? 0,
+    refreshedCandidates: refreshed.count ?? 0,
+    promotedCandidates: promoted.count ?? 0,
+    promotedInWindow: promotedInWindow.count ?? 0,
+    recent: activity.data ?? [],
+    lastRun: lastRun.data?.[0] ?? null,
   };
 }
 
@@ -162,16 +243,42 @@ export async function merchantList(
 export async function discoveryCandidates(
   supabase: Db,
   tenantId: string,
-  filters: { search?: string; status?: string },
+  filters: {
+    search?: string;
+    status?: string;
+    provider?: string;
+    origin?: string;
+    vertical?: string;
+    minScore?: number;
+    maxScore?: number;
+    observedSince?: string;
+    promoted?: boolean;
+    duplicatesOnly?: boolean;
+    hasWebsite?: boolean;
+    limit?: number;
+  } = {},
 ) {
   let query = supabase
     .from("discovery_candidates")
     .select("*")
     .eq("tenant_id", tenantId)
     .order("score", { ascending: false })
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending: false })
+    .limit(filters.limit ?? 200);
   if (filters.search) query = query.ilike("name", `%${filters.search}%`);
   if (filters.status) query = query.eq("status", filters.status as never);
+  if (filters.provider) query = query.eq("provider", filters.provider);
+  if (filters.origin) query = query.ilike("origin", `%${filters.origin}%`);
+  if (filters.vertical) query = query.eq("vertical", filters.vertical as never);
+  if (filters.minScore != null) query = query.gte("score", filters.minScore);
+  if (filters.maxScore != null) query = query.lte("score", filters.maxScore);
+  if (filters.observedSince) query = query.gte("first_seen_at", filters.observedSince);
+  if (filters.promoted === true) query = query.not("promoted_at", "is", null);
+  if (filters.promoted === false) query = query.is("promoted_at", null);
+  if (filters.duplicatesOnly === true) query = query.not("duplicate_of", "is", null);
+  if (filters.duplicatesOnly === false) query = query.is("duplicate_of", null);
+  if (filters.hasWebsite === true) query = query.not("website", "is", null);
+  if (filters.hasWebsite === false) query = query.is("website", null);
   const { data, error } = await query;
   if (error) throw error;
   return data ?? [];
@@ -316,6 +423,7 @@ export async function merchantDetail(supabase: Db, tenantId: string, merchantId:
     orders,
     subscription,
     events,
+    acquisition,
   ] = await Promise.all([
     supabase
       .from("merchants")
@@ -365,6 +473,7 @@ export async function merchantDetail(supabase: Db, tenantId: string, merchantId:
       .eq("subject_id", merchantId)
       .order("created_at", { ascending: false })
       .limit(50),
+    merchantAcquisitionContext(supabase, tenantId, merchantId),
   ]);
 
   if (merchant.error) throw merchant.error;
@@ -386,6 +495,34 @@ export async function merchantDetail(supabase: Db, tenantId: string, merchantId:
     orders: orders.data ?? [],
     subscription: subscription.data ?? null,
     events: events.data ?? [],
+    acquisition,
+  };
+}
+
+/** Read-only acquisition lineage: the source candidate this merchant was promoted from. */
+async function merchantAcquisitionContext(supabase: Db, tenantId: string, merchantId: string) {
+  const { data: candidate, error } = await supabase
+    .from("discovery_candidates")
+    .select(
+      "id, name, provider, origin, external_id, source_url, website, domain, phone, city, region, score, status, signals, evidence, first_seen_at, observed_at, last_refreshed_at, refresh_count, promoted_at, job_id",
+    )
+    .eq("tenant_id", tenantId)
+    .eq("merchant_id", merchantId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!candidate) return null;
+
+  const { data: job } = await supabase
+    .from("discovery_jobs")
+    .select("id, provider, query, city, region, vertical, mode, status, started_at, finished_at")
+    .eq("tenant_id", tenantId)
+    .eq("id", candidate.job_id ?? "")
+    .maybeSingle();
+
+  return {
+    candidate,
+    job: job ?? null,
+    originLabel: candidate.origin ?? null,
   };
 }
 
@@ -687,11 +824,27 @@ export async function promoteCandidate(
     .update({
       status: "claimed",
       merchant_id: merchant.id,
+      promoted_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
     .eq("tenant_id", tenantId)
     .eq("id", candidateId);
   if (updateError) throw updateError;
+
+  await recordEvent(supabase, {
+    tenantId,
+    actorId,
+    kind: "discovery.candidate_promoted",
+    subjectType: "candidate",
+    subjectId: candidateId,
+    payload: {
+      merchantId: merchant.id,
+      name: candidate.name,
+      origin: candidate.origin ?? null,
+      provider: candidate.provider,
+      score: candidate.score,
+    },
+  });
 
   if (candidate.city || candidate.region) {
     const { error: locationError } = await supabase.from("locations").insert({
@@ -706,6 +859,18 @@ export async function promoteCandidate(
   }
 
   return merchant;
+}
+
+export async function dismissCandidate(supabase: Db, tenantId: string, candidateId: string) {
+  const { error } = await supabase
+    .from("discovery_candidates")
+    .update({
+      status: "dismissed",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("tenant_id", tenantId)
+    .eq("id", candidateId);
+  if (error) throw error;
 }
 
 export async function createMerchant(
@@ -867,319 +1032,420 @@ export async function runMockVisibility(
   return { runId: run.id, mode: runResult.mode, snapshots: snapshots.length };
 }
 
-export const MOCK_DISCOVERY_SOURCE = "mock_discovery";
-
 export type RunDiscoveryInput = {
+  provider?: string;
   query?: string;
   city?: string;
+  region?: string;
   vertical?: string;
+  limit?: number;
 };
 
 export type RunDiscoveryResult = {
-  status: "succeeded" | "failed";
+  status: "succeeded" | "partially" | "failed";
   jobId: string;
   provider: string;
+  label: string;
+  mode: string;
   query: string;
   vertical: string | null;
   city: string | null;
+  region: string | null;
   foundCount: number;
+  receivedCount: number;
   createdCount: number;
   updatedCount: number;
+  dedupedCount: number;
+  failedCount: number;
+  warnings: string[];
   error: string | null;
+  startedAt: string;
+  finishedAt: string;
 };
 
-const VERTICAL_DEMO_NAMES: Record<string, string[]> = {
-  restaurant: [
-    "Harborline Grill",
-    "The Gilded Skillet",
-    "Marlow's Pasta Bar",
-    "Ember & Oak Kitchen",
-    "Saffron Street Eatery",
-    "Brine & Branch",
-  ],
-  home_service: [
-    "TrueNorth Plumbing",
-    "Brightline Electric",
-    "Pine & Copper Renovation",
-    "Summit Appliance Repair",
-    "Cedar Brook Heating",
-    "Crestpoint Roofing",
-  ],
-  beauty: [
-    "Lumen Beauty Bar",
-    "Copper Fox Salon",
-    "Pureform Skin Studio",
-    "Mirror & Muse Nails",
-    "Vela Hair Collective",
-    "Bloom & Tonic Spa",
-  ],
-  pet_service: [
-    "Wagstone Pet Co.",
-    "Pawprint Boarding",
-    "Fetch & Feather Grooming",
-    "Happy Tail Training",
-    "Velvet Pup Daycare",
-    "Treadwell Mobile Vet",
-  ],
-  automotive: [
-    "Monarch Auto Works",
-    "Redline Brake & Tire",
-    "Slate City Motors",
-    "Hardline Detailing",
-    "Cornerstone Lube",
-    "Ironworks Garage",
-  ],
-  local_retail: [
-    "Maple & Thread",
-    "Harbor Row Supply",
-    "Granite Street Market",
-    "Blue Door General",
-    "Pilion Books & Goods",
-    "Anchor & Grain",
-  ],
-  other: [
-    "Westfield Traders",
-    "Grandview Services",
-    "Fieldstone Studio",
-    "Ridgeline Supplies",
-    "Marlowe & Co.",
-    "Cedar Post Goods",
-  ],
-};
-
-const DEMO_VERTICALS = Object.keys(VERTICAL_DEMO_NAMES);
-const DEFAULT_QUERY = "local business";
-
-function hashString(input: string): number {
-  let hash = 2166136261;
-  for (let i = 0; i < input.length; i++) {
-    hash ^= input.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
-function seededRand(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/** Deterministic, vertical-aware mock candidates so re-runs refresh instead of duplicate. */
-function generateMockCandidates(input: RunDiscoveryInput): Array<{
-  name: string;
-  vertical: string;
-  city: string | null;
-  region: string | null;
-  phone: string;
-  website: string;
-  score: number;
-  dedupeKey: string;
-  signals: unknown[];
-  evidence: unknown[];
-  payload: Record<string, unknown>;
-}> {
-  const vertical = DEMO_VERTICALS.includes(input.vertical ?? "")
-    ? (input.vertical as string)
-    : "other";
-  const pool = VERTICAL_DEMO_NAMES[vertical] ?? VERTICAL_DEMO_NAMES["other"]!;
-  const rand = seededRand(
-    hashString(`${input.query ?? DEFAULT_QUERY}|${input.city ?? ""}|${vertical}`),
-  );
-
-  const order = [...pool];
-  for (let i = order.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [order[i], order[j]] = [order[j]!, order[i]!];
-  }
-
-  const city = input.city?.trim() ? input.city.trim() : null;
-  const now = new Date().toISOString();
-
-  return order.slice(0, 5).map((name, index) => ({
-    name,
-    vertical,
-    city,
-    region: null,
-    phone: `+1-415-555-01${index}`,
-    website: `https://www.${slugify(name).replace(/-/g, "")}.demo`,
-    score: Math.round((0.55 + rand() * 0.45) * 100) / 100,
-    dedupeKey: `${MOCK_DISCOVERY_SOURCE}:${slugify(name)}`,
-    signals: [
-      { signal: "listings_provider", value: MOCK_DISCOVERY_SOURCE },
-      { signal: "source", value: "mock local directory" },
-      { signal: "recently_observed", value: true },
-    ],
-    evidence: [
-      {
-        source: MOCK_DISCOVERY_SOURCE,
-        note: "Generated from a mock discovery source for demos.",
-        observed_at: now,
-      },
-    ],
-    payload: {
-      source: MOCK_DISCOVERY_SOURCE,
-      mock: true,
-      provider_version: "1.0",
-    },
-  }));
-}
-
-/** Run a mock discovery pass: persist a job, transcribe results into candidates, dedupe by key. */
+/** Run a discovery pass against a named source through the shared pipeline. */
 export async function runDiscovery(
   supabase: Db,
   tenantId: string,
   actorId: string,
   input: RunDiscoveryInput,
 ): Promise<RunDiscoveryResult> {
-  const query = input.query?.trim() ? input.query.trim() : DEFAULT_QUERY;
-  const vertical =
-    input.vertical && DEMO_VERTICALS.includes(input.vertical) ? input.vertical : null;
-  const city = input.city?.trim() ? input.city.trim() : null;
+  const provider = input.provider?.trim() || "local-demo";
+  const result = await runDiscoveryPipeline(supabase, tenantId, actorId, {
+    provider,
+    ...(input.query ? { query: input.query } : {}),
+    ...(input.city ? { city: input.city } : {}),
+    ...(input.region ? { region: input.region } : {}),
+    ...(input.vertical ? { vertical: input.vertical } : {}),
+    ...(input.limit != null ? { limit: input.limit } : {}),
+  });
+  return {
+    status: result.status,
+    jobId: result.jobId,
+    provider: result.provider,
+    label: result.label,
+    mode: result.mode,
+    query: result.query,
+    vertical: result.vertical,
+    city: result.city,
+    region: result.region,
+    foundCount: result.foundCount,
+    receivedCount: result.receivedCount,
+    createdCount: result.createdCount,
+    updatedCount: result.updatedCount,
+    dedupedCount: result.dedupedCount,
+    failedCount: result.failedCount,
+    warnings: result.warnings,
+    error: result.status === "failed" ? (result.warnings[0] ?? null) : null,
+    startedAt: result.startedAt,
+    finishedAt: result.finishedAt,
+  };
+}
 
+export function discoverySourceList() {
+  return DISCOVERY_SOURCES.map((source) => ({
+    provider: source.provider,
+    label: source.label,
+    description: source.description,
+    kind: source.kind,
+    requires: source.requires,
+    capabilities: source.capabilities,
+    supportsExternalId: source.supportsExternalId,
+    requiresLocation: source.requiresLocation ?? false,
+  }));
+}
+
+/** Persisted runtime health for the discovery-built-in sources, for the settings page. */
+export async function discoveryRuntimeHealth(
+  supabase: Db,
+  tenantId: string,
+): Promise<DiscoveryRuntimeHealth[]> {
+  const [connectors, jobsResults] = await Promise.all([
+    supabase.from("source_connectors").select("*").eq("tenant_id", tenantId),
+    supabase
+      .from("discovery_jobs")
+      .select("id, provider, status, started_at, finished_at, error")
+      .eq("tenant_id", tenantId)
+      .order("started_at", { ascending: false })
+      .limit(500),
+  ]);
+  if (connectors.error) throw connectors.error;
+  if (jobsResults.error) throw jobsResults.error;
+
+  const jobs = jobsResults.data ?? [];
+  const providers = [
+    ...new Set([
+      ...DISCOVERY_SOURCES.map((s) => s.provider),
+      ...connectors.data.map((c) => c.provider),
+    ]),
+  ];
+
+  return providers.map((provider) => {
+    const connector = (connectors.data ?? []).find((c) => c.provider === provider) ?? null;
+    const source = discoverySourceMeta(provider);
+    const providerJobs = jobs.filter((j) => j.provider === provider);
+    const lastJob = providerJobs[0] ?? null;
+
+    let status: DiscoveryRuntimeHealth["status"];
+    if (!connector || connector.status === "not_configured") {
+      if (connector == null && !source && providerJobs.length === 0) status = "never_run";
+      else if (connector == null && source && source.requires.length === 0) status = "configured";
+      else status = "not_configured";
+    } else {
+      status = connector.status;
+    }
+
+    // An env-not-configured source can never be more than not_configured.
+    if (status !== "error" && status !== "never_run") {
+      const envConfigured =
+        providerStatuses().find((entry) => entry.provider === provider)?.configured ?? false;
+      if (!envConfigured && source && source.requires.length > 0) status = "not_configured";
+    }
+
+    return {
+      provider,
+      status,
+      lastRunAt: connector?.last_run_at ?? lastJob?.started_at ?? null,
+      lastSuccessAt: connector?.last_success_at ?? null,
+      lastFailureAt: connector?.last_failure_at ?? null,
+      lastError:
+        connector?.last_error ?? (lastJob?.status === "failed" ? lastJob.error : null) ?? null,
+      totalRuns: providerJobs.length,
+      recordsReceived: connector?.records_received ?? null,
+      recordsIngested: connector?.records_ingested ?? null,
+    };
+  });
+}
+
+/** Sources merged with persisted connector + last-run health (tenant-scoped). */
+export async function discoverySourceHealth(supabase: Db, tenantId: string) {
+  const [connectors, recentlyRan] = await Promise.all([
+    supabase.from("source_connectors").select("*").eq("tenant_id", tenantId).order("provider"),
+    supabase
+      .from("discovery_jobs")
+      .select(
+        "id, provider, status, started_at, finished_at, created_count, updated_count, failed_count, error",
+      )
+      .eq("tenant_id", tenantId)
+      .order("started_at", { ascending: false })
+      .limit(200),
+  ]);
+  if (connectors.error) throw connectors.error;
+  if (recentlyRan.error) throw recentlyRan.error;
+
+  const jobsByProvider = (recentlyRan.data ?? []).reduce<Record<string, typeof recentlyRan.data>>(
+    (acc, job) => {
+      (acc[job.provider] ??= []).push(job);
+      return acc;
+    },
+    {},
+  );
+
+  const statuses = providerStatuses().filter((entry) => entry.category === "discovery");
+
+  return DISCOVERY_SOURCES.map((source) => {
+    const env = statuses.find((entry) => entry.provider === source.provider);
+    const connector =
+      (connectors.data ?? []).find((row) => row.provider === source.provider) ?? null;
+    const jobs = jobsByProvider[source.provider] ?? [];
+    const totalRuns = jobs.length;
+    const lastJob = jobs[0] ?? null;
+    const lastFailure =
+      connector?.last_failure_at ??
+      (lastJob?.status === "failed" ? lastJob.started_at : null) ??
+      null;
+    return {
+      provider: source.provider,
+      label: source.label,
+      description: source.description,
+      kind: source.kind,
+      requires: source.requires,
+      capabilities: source.capabilities,
+      requiresLocation: source.requiresLocation ?? false,
+      configured:
+        connector == null ? source.requires.length === 0 : connector.status !== "not_configured",
+      envConfigured: Boolean(env?.configured),
+      connector: connector
+        ? {
+            id: connector.id,
+            status: connector.status,
+            enabled: connector.enabled,
+            records_received: connector.records_received,
+            records_ingested: connector.records_ingested,
+            last_run_at: connector.last_run_at,
+            last_success_at: connector.last_success_at,
+            last_failure_at: connector.last_failure_at,
+            last_error: connector.last_error,
+          }
+        : null,
+      neverRun: totalRuns === 0 && !connector?.last_run_at,
+      totalRuns,
+      lastRunStatus: lastJob?.status ?? null,
+      lastJob: lastJob
+        ? {
+            id: lastJob.id,
+            status: lastJob.status,
+            started_at: lastJob.started_at,
+            finished_at: lastJob.finished_at,
+            created_count: lastJob.created_count,
+            updated_count: lastJob.updated_count,
+            failed_count: lastJob.failed_count,
+            error: lastJob.error,
+          }
+        : null,
+    };
+  });
+}
+
+/** Recent discovery runs with source labels, newest first. */
+export async function discoveryRuns(
+  supabase: Db,
+  tenantId: string,
+  opts: { provider?: string; limit?: number } = {},
+) {
+  let query = supabase
+    .from("discovery_jobs")
+    .select("*, source_connectors(name, provider)")
+    .eq("tenant_id", tenantId)
+    .order("started_at", { ascending: false })
+    .limit(opts.limit ?? 30);
+  if (opts.provider) query = query.eq("provider", opts.provider);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data ?? [];
+}
+
+/** Everything the Discovery workspace needs in one load. */
+export async function discoveryWorkspace(supabase: Db, tenantId: string) {
+  const [candidates, runs, connectors, sourceMeta] = await Promise.all([
+    supabase
+      .from("discovery_candidates")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .order("score", { ascending: false })
+      .order("updated_at", { ascending: false })
+      .limit(400),
+    supabase
+      .from("discovery_jobs")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .order("started_at", { ascending: false })
+      .limit(30),
+    supabase.from("source_connectors").select("*").eq("tenant_id", tenantId).order("provider"),
+    discoverySourceHealth(supabase, tenantId),
+  ]);
+  if (candidates.error) throw candidates.error;
+  if (connectors.error) throw connectors.error;
+  return {
+    candidates: candidates.data ?? [],
+    sources: connectors.data ?? [],
+    sourceMeta: sourceMeta,
+    runs: runs.data ?? [],
+  };
+}
+
+/** One run with the candidates it produced (run detail without log spelunking). */
+export async function discoveryRunDetail(supabase: Db, tenantId: string, runId: string) {
   const { data: job, error: jobError } = await supabase
     .from("discovery_jobs")
-    .insert({
-      tenant_id: tenantId,
-      provider: MOCK_DISCOVERY_SOURCE,
-      query,
-      vertical: (vertical as never) ?? null,
-      city,
-      status: "running",
-      requested_by: actorId,
-    })
-    .select("id")
+    .select("*, source_connectors(name, provider)")
+    .eq("tenant_id", tenantId)
+    .eq("id", runId)
     .single();
   if (jobError) throw jobError;
+  const { data: candidates, error: candidateError } = await supabase
+    .from("discovery_candidates")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .eq("job_id", runId)
+    .order("score", { ascending: false });
+  if (candidateError) throw candidateError;
+  return {
+    job,
+    label: job.provider ? (discoverySourceMeta(job.provider)?.label ?? job.provider) : job.provider,
+    candidates: candidates ?? [],
+  };
+}
 
-  try {
-    const found = generateMockCandidates({
-      query,
-      ...(vertical ? { vertical } : {}),
-      ...(city ? { city } : {}),
+/** Full evidence detail for one candidate. */
+export async function discoveryCandidateDetail(
+  supabase: Db,
+  tenantId: string,
+  candidateId: string,
+) {
+  const { data: candidate, error: candidateError } = await supabase
+    .from("discovery_candidates")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .eq("id", candidateId)
+    .single();
+  if (candidateError) throw candidateError;
+
+  const [sourceRecords, observations, duplicatesAsLosing, duplicatesAsWinning, merchant] =
+    await Promise.all([
+      supabase
+        .from("source_records")
+        .select("*, source_connectors(name, provider, category)")
+        .eq("tenant_id", tenantId)
+        .eq("candidate_id", candidateId)
+        .order("fetched_at", { ascending: false }),
+      supabase
+        .from("observations")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .eq("candidate_id", candidateId)
+        .order("observed_at", { ascending: false }),
+      supabase
+        .from("discovery_candidates")
+        .select("id, name, provider, score, status, origin, duplicate_of, match_reason, updated_at")
+        .eq("tenant_id", tenantId)
+        .eq("duplicate_of", candidateId),
+      supabase
+        .from("discovery_candidates")
+        .select("id, name, provider, score, status, origin, match_reason, updated_at")
+        .eq("tenant_id", tenantId)
+        .eq("id", candidate.duplicate_of ?? "00000000-0000-0000-0000-000000000000")
+        .maybeSingle(),
+      candidate.merchant_id
+        ? supabase
+            .from("merchants")
+            .select("id, name, slug, vertical, status, created_at, updated_at")
+            .eq("tenant_id", tenantId)
+            .eq("id", candidate.merchant_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+  if (sourceRecords.error) throw sourceRecords.error;
+  if (observations.error) throw observations.error;
+  if (duplicatesAsLosing.error) throw duplicatesAsLosing.error;
+  if (duplicatesAsWinning.error) throw duplicatesAsWinning.error;
+  if (merchant.error) throw merchant.error;
+
+  const probe = (sourceRecords.data ?? []).find((row) => row.kind === "website_probe") ?? null;
+
+  return {
+    candidate,
+    sourceRecords: sourceRecords.data ?? [],
+    observations: observations.data ?? [],
+    duplicates: duplicatesAsLosing.data ?? [],
+    duplicateOf: duplicatesAsWinning.data ?? null,
+    merchant: merchant.data ?? null,
+    probe,
+  };
+}
+
+export async function claimCandidate(
+  supabase: Db,
+  tenantId: string,
+  actorId: string,
+  candidateId: string,
+) {
+  const { data, error } = await supabase
+    .from("discovery_candidates")
+    .update({ status: "claimed", updated_at: new Date().toISOString() })
+    .eq("tenant_id", tenantId)
+    .eq("id", candidateId)
+    .select("id")
+    .single();
+  if (error) throw error;
+  await recordEvent(supabase, {
+    tenantId,
+    actorId,
+    kind: "candidate.claimed",
+    subjectType: "candidate",
+    subjectId: candidateId,
+    payload: {},
+  });
+  return data;
+}
+
+export async function refreshCandidate(
+  supabase: Db,
+  tenantId: string,
+  actorId: string,
+  candidateId: string,
+) {
+  const result = await refreshCandidatePipeline(supabase, tenantId, actorId, candidateId);
+  if (result.found) {
+    await recordEvent(supabase, {
+      tenantId,
+      actorId,
+      kind: "candidate.refreshed",
+      subjectType: "candidate",
+      subjectId: candidateId,
+      payload: { changed: result.changedFields.length },
     });
-
-    const { data: existing, error: fetchError } = await supabase
-      .from("discovery_candidates")
-      .select("id, dedupe_key")
-      .eq("tenant_id", tenantId)
-      .in(
-        "dedupe_key",
-        found.map((c) => c.dedupeKey),
-      );
-    if (fetchError) throw fetchError;
-
-    const existingKeys = new Set(
-      (existing ?? []).flatMap((row) => (row.dedupe_key ? [row.dedupe_key] : [])),
-    );
-    const now = new Date().toISOString();
-
-    const fresh = found.filter((c) => !existingKeys.has(c.dedupeKey));
-    const refresh = found.filter((c) => existingKeys.has(c.dedupeKey));
-
-    let createdCount = 0;
-    if (fresh.length > 0) {
-      const { error: insertError } = await supabase.from("discovery_candidates").insert(
-        fresh.map((c) => ({
-          tenant_id: tenantId,
-          name: c.name,
-          vertical: c.vertical as never,
-          city: c.city,
-          region: c.region,
-          website: c.website,
-          phone: c.phone,
-          score: c.score,
-          status: "new",
-          provider: MOCK_DISCOVERY_SOURCE,
-          job_id: job.id,
-          dedupe_key: c.dedupeKey,
-          signals: c.signals as never,
-          evidence: c.evidence as never,
-          payload: c.payload as never,
-          observed_at: now,
-        })),
-      );
-      if (insertError) throw insertError;
-      createdCount = fresh.length;
-    }
-
-    let updatedCount = 0;
-    if (refresh.length > 0) {
-      const candidateByKey = new Map(refresh.map((c) => [c.dedupeKey, c]));
-      for (const row of existing ?? []) {
-        if (!row.dedupe_key) continue;
-        const candidate = candidateByKey.get(row.dedupe_key);
-        if (!candidate) continue;
-        const { error: updateError } = await supabase
-          .from("discovery_candidates")
-          .update({
-            score: candidate.score,
-            city: candidate.city,
-            website: candidate.website,
-            phone: candidate.phone,
-            signals: candidate.signals as never,
-            evidence: candidate.evidence as never,
-            payload: candidate.payload as never,
-            job_id: job.id,
-            observed_at: now,
-            updated_at: now,
-          })
-          .eq("tenant_id", tenantId)
-          .eq("id", row.id);
-        if (updateError) throw updateError;
-        updatedCount += 1;
-      }
-    }
-
-    const { error: completeError } = await supabase
-      .from("discovery_jobs")
-      .update({
-        status: "succeeded",
-        found_count: found.length,
-        created_count: createdCount,
-        finished_at: now,
-      })
-      .eq("tenant_id", tenantId)
-      .eq("id", job.id);
-    if (completeError) throw completeError;
-
-    return {
-      status: "succeeded",
-      jobId: job.id,
-      provider: MOCK_DISCOVERY_SOURCE,
-      query,
-      vertical,
-      city,
-      foundCount: found.length,
-      createdCount,
-      updatedCount,
-      error: null,
-    };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Discovery run failed.";
-    await supabase
-      .from("discovery_jobs")
-      .update({ status: "failed", error: message, finished_at: new Date().toISOString() })
-      .eq("tenant_id", tenantId)
-      .eq("id", job.id);
-    return {
-      status: "failed",
-      jobId: job.id,
-      provider: MOCK_DISCOVERY_SOURCE,
-      query,
-      vertical,
-      city,
-      foundCount: 0,
-      createdCount: 0,
-      updatedCount: 0,
-      error: message,
-    };
+  } else {
+    await recordEvent(supabase, {
+      tenantId,
+      actorId,
+      kind: "candidate.refresh_missing",
+      subjectType: "candidate",
+      subjectId: candidateId,
+      payload: {},
+    });
   }
+  return result;
 }
 
 // =============== WEBSITE FACTORY ===============

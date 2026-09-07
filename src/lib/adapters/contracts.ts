@@ -6,6 +6,7 @@
  * vendor SDK directly. Mock implementations live in `*.server.ts` siblings and
  * live implementations plug in behind the same shape.
  */
+import type { SourceBusinessRecord } from "@/lib/discovery/normalize";
 
 export type AdapterMode = "mock" | "live";
 
@@ -23,7 +24,9 @@ export class ProviderNotConfiguredError extends Error {
     public provider: string,
     message?: string,
   ) {
-    super(message ?? `${provider} is not configured. Add its credentials in Settings → Integrations.`);
+    super(
+      message ?? `${provider} is not configured. Add its credentials in Settings → Integrations.`,
+    );
     this.name = "ProviderNotConfiguredError";
   }
 }
@@ -45,26 +48,36 @@ export type VisibilityProbe = {
 export type VisibilityAdapter = {
   readonly provider: string;
   status(): AdapterStatus;
-  probe(input: { merchantName: string; prompts: string[]; engines: string[] }): Promise<VisibilityProbe[]>;
+  probe(input: {
+    merchantName: string;
+    prompts: string[];
+    engines: string[];
+  }): Promise<VisibilityProbe[]>;
 };
 
 /* -------------------------------- Discovery ------------------------------- */
 
-export type DiscoveryResult = {
-  name: string;
-  vertical: string;
-  city: string;
-  region: string;
-  website: string | null;
-  phone: string | null;
-  score: number;
-  signals: string[];
-};
-
+/**
+ * Discovery sources return provider-native records. Normalization NEVER happens
+ * inside an adapter: the pipeline feeds each returned record into
+ * `normalizeRecord` so every candidate fact stays traceable to raw source data.
+ * Scoring is likewise owned by the pipeline, not the source.
+ */
 export type DiscoveryAdapter = {
   readonly provider: string;
   status(): AdapterStatus;
-  search(input: { query: string; vertical?: string; city?: string; limit?: number }): Promise<DiscoveryResult[]>;
+  /**
+   * Query a source. Adapters must return a truthful result for their own
+   * configuration state: a source without credentials throws
+   * `ProviderNotConfiguredError` instead of pretending to work.
+   */
+  search(input: {
+    query: string;
+    vertical?: string;
+    city?: string;
+    region?: string;
+    limit?: number;
+  }): Promise<SourceBusinessRecord[]>;
 };
 
 /* ---------------------------------- AI ------------------------------------ */
@@ -72,7 +85,10 @@ export type DiscoveryAdapter = {
 export type AiAdapter = {
   readonly provider: string;
   status(): AdapterStatus;
-  summarize(input: { instruction: string; content: string }): Promise<{ text: string; model: string }>;
+  summarize(input: {
+    instruction: string;
+    content: string;
+  }): Promise<{ text: string; model: string }>;
 };
 
 /* -------------------------------- Payments -------------------------------- */
@@ -80,7 +96,10 @@ export type AiAdapter = {
 export type PaymentsAdapter = {
   readonly provider: string;
   status(): AdapterStatus;
-  charge(input: { reference: string; amountCents: number }): Promise<{ id: string; status: string }>;
+  charge(input: {
+    reference: string;
+    amountCents: number;
+  }): Promise<{ id: string; status: string }>;
   refund(input: { reference: string }): Promise<{ id: string; status: string }>;
 };
 

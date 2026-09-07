@@ -28,7 +28,7 @@ import { EditCatalogDialog } from "@/components/merchants/edit-catalog-dialog";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -231,7 +231,168 @@ function OverviewTab({ detail, onSaved }: { detail: Detail; onSaved: () => void 
       </Card>
 
       <WebsiteCard detail={detail} onSaved={onSaved} />
+
+      <AcquisitionPanel detail={detail} />
     </div>
+  );
+}
+
+type AcquisitionContext = Detail["acquisition"];
+
+function formatRelative2(value: string | null): string {
+  if (!value) return "—";
+  const diff = Date.now() - new Date(value).getTime();
+  const minutes = Math.round(diff / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return formatDate(value);
+}
+
+function AcquisitionPanel({ detail }: { detail: Detail }) {
+  const acquisition = detail.acquisition as AcquisitionContext | null;
+
+  if (!acquisition) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Acquisition context</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            This merchant was not created from a discovery candidate. No acquisition lineage is
+            recorded for it.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const { candidate, job } = acquisition;
+  const signals = Array.isArray(candidate.signals)
+    ? candidate.signals.filter((signal): signal is string => typeof signal === "string")
+    : [];
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center justify-between text-base">
+          <span>Acquisition context</span>
+          {candidate.promoted_at ? (
+            <Badge>Promoted {formatDate(candidate.promoted_at)}</Badge>
+          ) : null}
+        </CardTitle>
+        <CardDescription>
+          How this merchant entered the workspace — read-only lineage from the discovery source.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <dt className="text-muted-foreground">Candidate</dt>
+            <dd className="font-medium">{candidate.name}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Source</dt>
+            <dd className="font-medium">
+              {candidate.provider}
+              {candidate.origin ? ` · ${candidate.origin}` : ""}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Score at acquisition</dt>
+            <dd className="font-medium">{candidate.score ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">External ID</dt>
+            <dd className="break-all font-mono text-xs">{candidate.external_id ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">First seen</dt>
+            <dd className="font-medium">{formatDate(candidate.first_seen_at ?? "")}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Last refreshed</dt>
+            <dd className="font-medium">
+              {candidate.last_refreshed_at
+                ? `${formatRelative2(candidate.last_refreshed_at)} · ${candidate.refresh_count ?? 0} refresh${(candidate.refresh_count ?? 0) === 1 ? "" : "es"}`
+                : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Phone</dt>
+            <dd className="font-medium">{candidate.phone ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Location</dt>
+            <dd className="font-medium">
+              {[candidate.city, candidate.region].filter(Boolean).join(", ") || "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">Raw site</dt>
+            <dd className="break-all text-xs">
+              {candidate.website ? (
+                <a
+                  href={candidate.website}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                >
+                  {candidate.domain ?? candidate.website}
+                  <ExternalLink className="size-3" />
+                </a>
+              ) : (
+                "—"
+              )}
+            </dd>
+          </div>
+        </dl>
+
+        {candidate.source_url ? (
+          <a
+            href={candidate.source_url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+          >
+            Open original source record
+            <ExternalLink className="size-3" />
+          </a>
+        ) : null}
+
+        {signals.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {signals.map((signal) => (
+              <Badge key={signal} variant="secondary" className="font-mono text-[11px]">
+                {signal}
+              </Badge>
+            ))}
+          </div>
+        ) : null}
+
+        {job ? (
+          <div className="rounded-md border bg-muted/30 p-2.5 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">
+              {job.provider} run · {job.status}
+            </span>
+            <span className="mx-1.5">·</span>
+            <span>
+              query “{job.query || "default"}”
+              {[job.city, job.region].filter(Boolean).length > 0
+                ? ` in ${[job.city, job.region].filter(Boolean).join(", ")}`
+                : ""}
+              {job.vertical ? ` · ${job.vertical}` : ""}
+            </span>
+            <span className="mx-1.5">·</span>
+            <span>{formatRelative2(job.started_at)}</span>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 

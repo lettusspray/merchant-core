@@ -27,6 +27,19 @@ export type ProviderConfigStatus = {
   detail: string;
 };
 
+/** Extra runtime health for discovery sources, surfaced from persisted state. */
+export type DiscoveryRuntimeHealth = {
+  provider: string;
+  status: "not_configured" | "configured" | "syncing" | "error" | "never_run";
+  lastRunAt: string | null;
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
+  lastError: string | null;
+  totalRuns: number;
+  recordsReceived: number | null;
+  recordsIngested: number | null;
+};
+
 function env(name: string): string | undefined {
   const value = process.env[name];
   return value && value.trim().length > 0 ? value.trim() : undefined;
@@ -58,6 +71,10 @@ export const MERCERCROFT_ENV = {
   webhookSecret: "MERCERCROFT_WEBHOOK_SECRET",
 } as const;
 
+export const GOOGLE_PLACES_ENV = {
+  apiKey: "GOOGLE_PLACES_API_KEY",
+} as const;
+
 export function providerStatuses(): ProviderConfigStatus[] {
   return [
     status(
@@ -79,51 +96,123 @@ export function providerStatuses(): ProviderConfigStatus[] {
       "Inbound run callbacks are signature-verified.",
     ),
     status(
-      { provider: "lovable-ai", category: "ai", label: "Lovable AI Gateway", requires: ["LOVABLE_API_KEY"] },
+      {
+        provider: "lovable-ai",
+        category: "ai",
+        label: "Lovable AI Gateway",
+        requires: ["LOVABLE_API_KEY"],
+      },
       "Default LLM route (Gemini / GPT families) is available.",
     ),
-    status({ provider: "openai", category: "ai", label: "OpenAI", requires: ["OPENAI_API_KEY"] }, "Available."),
-    status({ provider: "anthropic", category: "ai", label: "Anthropic", requires: ["ANTHROPIC_API_KEY"] }, "Available."),
-    status({ provider: "google", category: "ai", label: "Google AI", requires: ["GOOGLE_AI_API_KEY"] }, "Available."),
     status(
-      { provider: "openrouter", category: "ai", label: "OpenRouter (aggregator)", requires: ["OPENROUTER_API_KEY"] },
+      { provider: "openai", category: "ai", label: "OpenAI", requires: ["OPENAI_API_KEY"] },
+      "Available.",
+    ),
+    status(
+      {
+        provider: "anthropic",
+        category: "ai",
+        label: "Anthropic",
+        requires: ["ANTHROPIC_API_KEY"],
+      },
+      "Available.",
+    ),
+    status(
+      { provider: "google", category: "ai", label: "Google AI", requires: ["GOOGLE_AI_API_KEY"] },
+      "Available.",
+    ),
+    status(
+      {
+        provider: "openrouter",
+        category: "ai",
+        label: "OpenRouter (aggregator)",
+        requires: ["OPENROUTER_API_KEY"],
+      },
       "Available — routes to OpenAI/Anthropic/Qwen/DeepSeek models.",
     ),
-    status({ provider: "deepseek", category: "ai", label: "DeepSeek", requires: ["DEEPSEEK_API_KEY"] }, "Available."),
     status(
-      { provider: "stripe", category: "payments", label: "Stripe Connect", requires: ["STRIPE_SECRET_KEY"] },
+      { provider: "deepseek", category: "ai", label: "DeepSeek", requires: ["DEEPSEEK_API_KEY"] },
+      "Available.",
+    ),
+    status(
+      {
+        provider: "stripe",
+        category: "payments",
+        label: "Stripe Connect",
+        requires: ["STRIPE_SECRET_KEY"],
+      },
       "Checkout sessions and refunds are created against Stripe.",
     ),
     status(
-      { provider: "stripe-webhook", category: "payments", label: "Stripe webhook signature", requires: ["STRIPE_WEBHOOK_SECRET"] },
+      {
+        provider: "stripe-webhook",
+        category: "payments",
+        label: "Stripe webhook signature",
+        requires: ["STRIPE_WEBHOOK_SECRET"],
+      },
       "Inbound Stripe events are signature-verified.",
     ),
     status(
-      { provider: "paystack", category: "payments", label: "Paystack", requires: ["PAYSTACK_SECRET_KEY"] },
+      {
+        provider: "paystack",
+        category: "payments",
+        label: "Paystack",
+        requires: ["PAYSTACK_SECRET_KEY"],
+      },
       "Transactions are initialised against Paystack.",
     ),
     status(
-      { provider: "google-places", category: "discovery", label: "Google Places", requires: ["GOOGLE_PLACES_API_KEY"] },
+      {
+        provider: "google-places",
+        category: "discovery",
+        label: "Google Places",
+        requires: ["GOOGLE_PLACES_API_KEY"],
+      },
       "Place search discovery is live.",
     ),
     status(
-      { provider: "website-probe", category: "discovery", label: "Website presence probe", requires: [] },
+      {
+        provider: "website-probe",
+        category: "discovery",
+        label: "Website presence probe",
+        requires: [],
+      },
       "Built-in. Performs real HTTPS reachability and digital-gap checks.",
     ),
     status(
-      { provider: "s3", category: "storage", label: "S3-compatible object storage", requires: ["S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"] },
+      {
+        provider: "s3",
+        category: "storage",
+        label: "S3-compatible object storage",
+        requires: ["S3_ENDPOINT", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"],
+      },
       "Asset uploads and signed reads are live.",
     ),
     status(
-      { provider: "redis", category: "cache", label: "Redis (Upstash REST)", requires: ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"] },
+      {
+        provider: "redis",
+        category: "cache",
+        label: "Redis (Upstash REST)",
+        requires: ["UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN"],
+      },
       "Idempotency keys and rate limits are stored in Redis.",
     ),
     status(
-      { provider: "sentry", category: "observability", label: "Sentry-compatible error capture", requires: ["SENTRY_DSN"] },
+      {
+        provider: "sentry",
+        category: "observability",
+        label: "Sentry-compatible error capture",
+        requires: ["SENTRY_DSN"],
+      },
       "Server errors are forwarded to Sentry.",
     ),
     status(
-      { provider: "temporal", category: "workflow", label: "Temporal", requires: ["TEMPORAL_ADDRESS", "TEMPORAL_NAMESPACE"] },
+      {
+        provider: "temporal",
+        category: "workflow",
+        label: "Temporal",
+        requires: ["TEMPORAL_ADDRESS", "TEMPORAL_NAMESPACE"],
+      },
       "Workflows are dispatched to Temporal.",
     ),
   ];

@@ -184,7 +184,7 @@ function UnavailableState() {
   );
 }
 
-export function PublicMerchantPage({ page }: { page: PublicPage }) {
+export function PublicMerchantPage({ page }: { page: PublicPage | null }) {
   if (!page) return <UnavailableState />;
 
   const { website, revision } = page;

@@ -4,9 +4,16 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { providerStatuses, type ProviderConfigStatus } from "@/lib/config.server";
 import {
+  claimCandidate,
   createMerchant,
   dashboardSnapshot,
+  discoveryCandidateDetail,
   discoveryCandidates,
+  discoveryRunDetail,
+  discoveryRuns,
+  discoveryRuntimeHealth,
+  discoverySourceHealth,
+  discoveryWorkspace,
   ensureWebsiteForMerchant,
   generateHomePageFromGraph,
   getWebsiteWithPages,
@@ -18,10 +25,12 @@ import {
   merchantDetail,
   merchantList,
   ordersList,
+  dismissCandidate,
   promoteCandidate,
   PUBLISH_STATES,
   publishPage,
   recordEvent,
+  refreshCandidate,
   resolveTenant,
   runDiscovery,
   runMockVisibility,
@@ -102,9 +111,12 @@ const locationSchema = z.object({
 });
 
 const runDiscoverySchema = z.object({
+  provider: z.string().trim().max(60).optional(),
   query: z.string().trim().max(120).optional(),
   city: z.string().trim().max(120).optional(),
+  region: z.string().trim().max(120).optional(),
   vertical: z.string().trim().max(40).optional(),
+  limit: z.number().int().min(1).max(50).optional(),
 });
 
 const catalogItemSchema = z.discriminatedUnion("kind", [
@@ -283,17 +295,85 @@ export const upsertCatalogItemFn = createServerFn({ method: "POST" })
   });
 
 export const discoveryCandidatesFn = createServerFn({ method: "GET" })
-  .validator((input: { q?: string; status?: string }) => input)
+  .validator(
+    (input: {
+      q?: string;
+      status?: string;
+      provider?: string;
+      origin?: string;
+      vertical?: string;
+      minScore?: number;
+      maxScore?: number;
+      observedSince?: string;
+      promoted?: boolean;
+      duplicates?: boolean;
+      hasWebsite?: boolean;
+      limit?: number;
+    }) => input,
+  )
   .middleware([requireSupabaseAuth])
   .handler(async ({ context, data }) => {
     const supabase = context.supabase;
     const tenantId = await resolveTenant(supabase);
-    const filters: { search?: string; status?: string } = {};
+    const filters: Parameters<typeof discoveryCandidates>[2] = {};
     if (data.q?.trim()) filters.search = data.q.trim();
     if (data.status?.trim()) filters.status = data.status.trim();
+    if (data.provider?.trim()) filters.provider = data.provider.trim();
+    if (data.origin?.trim()) filters.origin = data.origin.trim();
+    if (data.vertical?.trim()) filters.vertical = data.vertical.trim();
+    if (data.minScore != null) filters.minScore = data.minScore;
+    if (data.maxScore != null) filters.maxScore = data.maxScore;
+    if (data.observedSince) filters.observedSince = data.observedSince;
+    if (data.promoted != null) filters.promoted = data.promoted;
+    if (data.duplicates != null) filters.duplicatesOnly = data.duplicates;
+    if (data.hasWebsite != null) filters.hasWebsite = data.hasWebsite;
+    if (data.limit != null) filters.limit = data.limit;
     const candidates = await discoveryCandidates(supabase, tenantId, filters);
 
     return { candidates };
+  });
+
+export const discoveryWorkspaceFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    return discoveryWorkspace(supabase, tenantId);
+  });
+
+export const discoverySourceHealthFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    return { sources: await discoverySourceHealth(supabase, tenantId) };
+  });
+
+export const discoveryRunsFn = createServerFn({ method: "GET" })
+  .validator((input: { provider?: string; limit?: number }) => input)
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    return { runs: await discoveryRuns(supabase, tenantId, data) };
+  });
+
+export const discoveryRunDetailFn = createServerFn({ method: "GET" })
+  .validator((input: { runId: string }) => input)
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    return discoveryRunDetail(supabase, tenantId, data.runId);
+  });
+
+export const discoveryCandidateDetailFn = createServerFn({ method: "GET" })
+  .validator((input: { candidateId: string }) => input)
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    return discoveryCandidateDetail(supabase, tenantId, data.candidateId);
   });
 
 export const happeningsListFn = createServerFn({ method: "GET" })
@@ -364,6 +444,14 @@ export const providerStatusesFn = createServerFn({ method: "GET" }).handler(() =
   return { statuses: providerStatuses() };
 });
 
+export const discoveryRuntimeHealthFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    return { sources: await discoveryRuntimeHealth(supabase, tenantId) };
+  });
+
 export const updateHappeningStatusFn = createServerFn({ method: "POST" })
   .validator(
     (input: {
@@ -412,6 +500,24 @@ export const promoteCandidateFn = createServerFn({ method: "POST" })
     return { merchant };
   });
 
+export const dismissCandidateFn = createServerFn({ method: "POST" })
+  .validator((input: { candidateId: string }) => input)
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    await dismissCandidate(supabase, tenantId, data.candidateId);
+    await recordEvent(supabase, {
+      tenantId,
+      actorId: context.userId,
+      kind: "candidate.dismissed",
+      subjectType: "candidate",
+      subjectId: data.candidateId,
+      payload: {},
+    });
+    return { success: true };
+  });
+
 export const createMerchantFn = createServerFn({ method: "POST" })
   .validator((input: { name: string; vertical?: string; city?: string; region?: string }) => input)
   .middleware([requireSupabaseAuth])
@@ -455,9 +561,12 @@ export const runDiscoveryFn = createServerFn({ method: "POST" })
     const supabase = context.supabase;
     const tenantId = await resolveTenant(supabase);
     const result = await runDiscovery(supabase, tenantId, context.userId, {
+      ...(data.provider ? { provider: data.provider } : {}),
       ...(data.query ? { query: data.query } : {}),
       ...(data.city ? { city: data.city } : {}),
+      ...(data.region ? { region: data.region } : {}),
       ...(data.vertical ? { vertical: data.vertical } : {}),
+      ...(data.limit != null ? { limit: data.limit } : {}),
     });
     await recordEvent(supabase, {
       tenantId,
@@ -470,9 +579,14 @@ export const runDiscoveryFn = createServerFn({ method: "POST" })
         query: result.query,
         vertical: result.vertical ?? undefined,
         city: result.city ?? undefined,
+        region: result.region ?? undefined,
+        mode: result.mode,
         found: result.foundCount,
+        received: result.receivedCount,
         created: result.createdCount,
         updated: result.updatedCount,
+        deduped: result.dedupedCount,
+        warnings: result.warnings,
         error: result.error ?? undefined,
       },
     });
@@ -480,6 +594,26 @@ export const runDiscoveryFn = createServerFn({ method: "POST" })
       throw new Error(result.error ?? "Discovery run failed.");
     }
     return { result };
+  });
+
+export const refreshCandidateFn = createServerFn({ method: "POST" })
+  .validator((input: { candidateId: string }) => input)
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    const result = await refreshCandidate(supabase, tenantId, context.userId, data.candidateId);
+    return { result };
+  });
+
+export const claimCandidateFn = createServerFn({ method: "POST" })
+  .validator((input: { candidateId: string }) => input)
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    const candidate = await claimCandidate(supabase, tenantId, context.userId, data.candidateId);
+    return { candidate };
   });
 
 // =============== WEBSITE FACTORY ===============
