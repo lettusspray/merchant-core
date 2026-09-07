@@ -216,21 +216,41 @@ export type Database = {
       }
       discovery_candidates: {
         Row: {
+          address_line1: string | null
+          category_label: string | null
           city: string | null
+          connector_id: string | null
+          country: string | null
           created_at: string
           dedupe_key: string | null
+          domain: string | null
+          duplicate_of: string | null
           evidence: Json
+          external_id: string | null
+          first_seen_at: string
           id: string
           job_id: string | null
+          last_refreshed_at: string | null
+          latitude: number | null
+          longitude: number | null
+          match_reason: string | null
           merchant_id: string | null
           name: string
+          normalized: Json
           observed_at: string
+          origin: string
           payload: Json
           phone: string | null
+          phone_e164: string | null
+          postal_code: string | null
+          promoted_at: string | null
           provider: string
+          refresh_count: number
           region: string | null
           score: number
+          score_components: Json
           signals: Json
+          source_url: string | null
           status: Database["public"]["Enums"]["discovery_status"]
           tenant_id: string
           updated_at: string
@@ -238,21 +258,41 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          address_line1?: string | null
+          category_label?: string | null
           city?: string | null
+          connector_id?: string | null
+          country?: string | null
           created_at?: string
           dedupe_key?: string | null
+          domain?: string | null
+          duplicate_of?: string | null
           evidence?: Json
+          external_id?: string | null
+          first_seen_at?: string
           id?: string
           job_id?: string | null
+          last_refreshed_at?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          match_reason?: string | null
           merchant_id?: string | null
           name: string
+          normalized?: Json
           observed_at?: string
+          origin?: string
           payload?: Json
           phone?: string | null
+          phone_e164?: string | null
+          postal_code?: string | null
+          promoted_at?: string | null
           provider?: string
+          refresh_count?: number
           region?: string | null
           score?: number
+          score_components?: Json
           signals?: Json
+          source_url?: string | null
           status?: Database["public"]["Enums"]["discovery_status"]
           tenant_id: string
           updated_at?: string
@@ -260,21 +300,41 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          address_line1?: string | null
+          category_label?: string | null
           city?: string | null
+          connector_id?: string | null
+          country?: string | null
           created_at?: string
           dedupe_key?: string | null
+          domain?: string | null
+          duplicate_of?: string | null
           evidence?: Json
+          external_id?: string | null
+          first_seen_at?: string
           id?: string
           job_id?: string | null
+          last_refreshed_at?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          match_reason?: string | null
           merchant_id?: string | null
           name?: string
+          normalized?: Json
           observed_at?: string
+          origin?: string
           payload?: Json
           phone?: string | null
+          phone_e164?: string | null
+          postal_code?: string | null
+          promoted_at?: string | null
           provider?: string
+          refresh_count?: number
           region?: string | null
           score?: number
+          score_components?: Json
           signals?: Json
+          source_url?: string | null
           status?: Database["public"]["Enums"]["discovery_status"]
           tenant_id?: string
           updated_at?: string
@@ -282,6 +342,20 @@ export type Database = {
           website?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "discovery_candidates_connector_id_fkey"
+            columns: ["connector_id"]
+            isOneToOne: false
+            referencedRelation: "source_connectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "discovery_candidates_duplicate_of_fkey"
+            columns: ["duplicate_of"]
+            isOneToOne: false
+            referencedRelation: "discovery_candidates"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "discovery_candidates_job_id_fkey"
             columns: ["job_id"]
@@ -308,56 +382,87 @@ export type Database = {
       discovery_jobs: {
         Row: {
           city: string | null
+          connector_id: string | null
           created_at: string
           created_count: number
+          deduped_count: number
           error: string | null
+          failed_count: number
           finished_at: string | null
           found_count: number
           id: string
+          mode: string
           provider: string
           query: string
+          received_count: number
+          region: string | null
           requested_by: string | null
           started_at: string
           status: Database["public"]["Enums"]["workflow_status"]
           tenant_id: string
           updated_at: string
+          updated_count: number
           vertical: Database["public"]["Enums"]["vertical"] | null
+          warnings: Json
         }
         Insert: {
           city?: string | null
+          connector_id?: string | null
           created_at?: string
           created_count?: number
+          deduped_count?: number
           error?: string | null
+          failed_count?: number
           finished_at?: string | null
           found_count?: number
           id?: string
+          mode?: string
           provider: string
           query: string
+          received_count?: number
+          region?: string | null
           requested_by?: string | null
           started_at?: string
           status?: Database["public"]["Enums"]["workflow_status"]
           tenant_id: string
           updated_at?: string
+          updated_count?: number
           vertical?: Database["public"]["Enums"]["vertical"] | null
+          warnings?: Json
         }
         Update: {
           city?: string | null
+          connector_id?: string | null
           created_at?: string
           created_count?: number
+          deduped_count?: number
           error?: string | null
+          failed_count?: number
           finished_at?: string | null
           found_count?: number
           id?: string
+          mode?: string
           provider?: string
           query?: string
+          received_count?: number
+          region?: string | null
           requested_by?: string | null
           started_at?: string
           status?: Database["public"]["Enums"]["workflow_status"]
           tenant_id?: string
           updated_at?: string
+          updated_count?: number
           vertical?: Database["public"]["Enums"]["vertical"] | null
+          warnings?: Json
         }
         Relationships: [
+          {
+            foreignKeyName: "discovery_jobs_connector_id_fkey"
+            columns: ["connector_id"]
+            isOneToOne: false
+            referencedRelation: "source_connectors"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "discovery_jobs_tenant_id_fkey"
             columns: ["tenant_id"]
@@ -826,48 +931,64 @@ export type Database = {
       }
       observations: {
         Row: {
+          candidate_id: string | null
           confidence: number
           created_at: string
           current_value: string | null
           field_path: string
           id: string
-          merchant_id: string
+          merchant_id: string | null
           observed_at: string
           observed_value: string | null
+          provider: string | null
           source_record_id: string | null
+          source_url: string | null
           status: Database["public"]["Enums"]["observation_status"]
           tenant_id: string
           updated_at: string
         }
         Insert: {
+          candidate_id?: string | null
           confidence?: number
           created_at?: string
           current_value?: string | null
           field_path: string
           id?: string
-          merchant_id: string
+          merchant_id?: string | null
           observed_at?: string
           observed_value?: string | null
+          provider?: string | null
           source_record_id?: string | null
+          source_url?: string | null
           status?: Database["public"]["Enums"]["observation_status"]
           tenant_id: string
           updated_at?: string
         }
         Update: {
+          candidate_id?: string | null
           confidence?: number
           created_at?: string
           current_value?: string | null
           field_path?: string
           id?: string
-          merchant_id?: string
+          merchant_id?: string | null
           observed_at?: string
           observed_value?: string | null
+          provider?: string | null
           source_record_id?: string | null
+          source_url?: string | null
           status?: Database["public"]["Enums"]["observation_status"]
           tenant_id?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "observations_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "discovery_candidates"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "observations_merchant_id_fkey"
             columns: ["merchant_id"]
@@ -1217,34 +1338,58 @@ export type Database = {
       }
       source_connectors: {
         Row: {
+          category: string
           config: Json
           created_at: string
+          enabled: boolean
           id: string
+          last_error: string | null
+          last_failure_at: string | null
+          last_run_at: string | null
+          last_success_at: string | null
           last_synced_at: string | null
           name: string
           provider: string
+          records_ingested: number
+          records_received: number
           status: Database["public"]["Enums"]["connector_status"]
           tenant_id: string
           updated_at: string
         }
         Insert: {
+          category?: string
           config?: Json
           created_at?: string
+          enabled?: boolean
           id?: string
+          last_error?: string | null
+          last_failure_at?: string | null
+          last_run_at?: string | null
+          last_success_at?: string | null
           last_synced_at?: string | null
           name: string
           provider: string
+          records_ingested?: number
+          records_received?: number
           status?: Database["public"]["Enums"]["connector_status"]
           tenant_id: string
           updated_at?: string
         }
         Update: {
+          category?: string
           config?: Json
           created_at?: string
+          enabled?: boolean
           id?: string
+          last_error?: string | null
+          last_failure_at?: string | null
+          last_run_at?: string | null
+          last_success_at?: string | null
           last_synced_at?: string | null
           name?: string
           provider?: string
+          records_ingested?: number
+          records_received?: number
           status?: Database["public"]["Enums"]["connector_status"]
           tenant_id?: string
           updated_at?: string
@@ -1261,39 +1406,61 @@ export type Database = {
       }
       source_records: {
         Row: {
+          candidate_id: string | null
           connector_id: string
+          content_hash: string | null
           created_at: string
           external_id: string | null
           fetched_at: string
           id: string
+          kind: string
           merchant_id: string | null
           payload: Json
+          provider: string | null
+          source_url: string | null
           tenant_id: string
           updated_at: string
         }
         Insert: {
+          candidate_id?: string | null
           connector_id: string
+          content_hash?: string | null
           created_at?: string
           external_id?: string | null
           fetched_at?: string
           id?: string
+          kind?: string
           merchant_id?: string | null
           payload?: Json
+          provider?: string | null
+          source_url?: string | null
           tenant_id: string
           updated_at?: string
         }
         Update: {
+          candidate_id?: string | null
           connector_id?: string
+          content_hash?: string | null
           created_at?: string
           external_id?: string | null
           fetched_at?: string
           id?: string
+          kind?: string
           merchant_id?: string | null
           payload?: Json
+          provider?: string | null
+          source_url?: string | null
           tenant_id?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "source_records_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "discovery_candidates"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "source_records_connector_id_fkey"
             columns: ["connector_id"]
