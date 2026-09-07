@@ -254,3 +254,28 @@ case-by-case reasoning (all `TO authenticated`, owner = authenticated user with 
 15. Email self-claim — the broad member `UPDATE` policy is dropped, so the only way to change a `merchant_owners` row is via `owner claim merchant_owners`: allowed only when `lower(email)` equals the signed-in JWT email and the row is pending (or already bound to that user); `WITH CHECK` pins `user_id = auth.uid()` with the email unchanged, and the trigger keeps tenant/merchant/email fixed → the claim can't be forged onto another row, another email's invite, or another merchant.
 16. Non-owner authenticated user — no `merchant_owners` row for any merchant they don't own → every owner predicate is false and every owner policy returns no rows → the graph tables are closed to them.
 - Empty environments: re-run migrations (or apply them to a fresh branch) to reload the demo workspace.
+
+## Website factory lifecycle
+
+`supabase/migrations/20260907130000_website_factory_lifecycle.sql` makes homepage revisions
+explicit and trustworthy. One representation is authoritative — the **persisted revision**:
+
+- `website_pages` is only the current (working/latest) revision; every `Generate home` writes a
+  new draft here, advances its `version`, and inserts the matching immutable row into
+  `website_page_versions`. The working row's content is never what the public site serves.
+- `website_page_versions` is immutable history. A trigger freezes all columns except the
+  `locked` flag and rejects deletes, so a published revision can never be silently rewritten.
+  Version records are scoped by `website_id` and selected deterministically per published
+  version.
+- **Publish** promotes the current working revision: `websites.state = 'published'` +
+  `websites.published_version = <revision version>`. The public route (`/p/$slug`) resolves the
+  merchant, then reads exactly the version record for the published version — never draft rows,
+  never live merchant/location/catalog data. **Unpublish** removes public availability via
+  `state = 'draft'` without deleting history.
+- **Lock** (operator `Website Factory` or merchant portal) sets `locked` on the page row and
+  matching version record. Regeneration always produces a new unlocked draft candidate on top of
+  the current revision; locked revisions stay intact in history. Newly generated revisions are
+  never auto-locked.
+- RLS: anonymous users can read only the published revision of a published
+  site (`state = 'published' AND published_version = version`); owners get read/insert/update on
+  the version history scoped to their own merchants.

@@ -5,6 +5,7 @@ import {
   FilePlus2,
   Loader2,
   Lock,
+  LockOpen,
   MapPin,
   Package,
   Store,
@@ -23,6 +24,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import {
   portalGenerateHomeFn,
   portalPublishFn,
+  portalSetHomePageLockFn,
   portalUnpublishFn,
 } from "@/lib/api/portal.functions";
 import { usePortal, type PortalMerchant } from "./portal-context";
@@ -56,12 +58,14 @@ function countFor(merchant: PortalMerchant, key: string): number {
 function WebsitePanel({ merchant }: { merchant: PortalMerchant }) {
   const { data, refresh } = usePortal();
   const website = merchant.websites?.[0] ?? null;
-  const pages = merchant.websitePages?.website_pages ?? [];
+  const websitePages = merchant.websitePages;
+  const pages = websitePages?.website_pages ?? [];
+  const lifecycle = websitePages?.lifecycle;
   const publicSlug = website?.slug ?? merchant.merchant.slug ?? null;
-  const [busy, setBusy] = useState<"generate" | "publish" | "unpublish" | null>(null);
+  const [busy, setBusy] = useState<"generate" | "publish" | "unpublish" | "lock" | null>(null);
   const [notice, setNotice] = useState<{ kind: "error" | "success"; text: string } | null>(null);
 
-  async function run(next: "generate" | "publish" | "unpublish") {
+  async function run(next: "generate" | "publish" | "unpublish" | "lock") {
     if (busy) return;
     setBusy(next);
     setNotice(null);
@@ -70,14 +74,25 @@ function WebsitePanel({ merchant }: { merchant: PortalMerchant }) {
         await portalGenerateHomeFn({ data: { merchantId: merchant.merchant.id } });
         setNotice({
           kind: "success",
-          text: "Home page regenerated from your latest details as a draft. Publish to go live.",
+          text: "A new homepage revision was generated from your latest details. Publish when you're ready to go live.",
         });
       } else if (next === "publish") {
         await portalPublishFn({ data: { merchantId: merchant.merchant.id } });
         setNotice({ kind: "success", text: "Your site is live." });
-      } else {
+      } else if (next === "unpublish") {
         await portalUnpublishFn({ data: { merchantId: merchant.merchant.id } });
         setNotice({ kind: "success", text: "Your site is now unpublished." });
+      } else {
+        const locked = !(lifecycle?.currentRevisionLocked ?? false);
+        await portalSetHomePageLockFn({
+          data: { merchantId: merchant.merchant.id, locked },
+        });
+        setNotice({
+          kind: "success",
+          text: locked
+            ? "This revision is now locked. Regenerating will create a new draft and keep this revision intact."
+            : "Revision unlocked.",
+        });
       }
       await refresh();
     } catch (err) {
@@ -86,6 +101,11 @@ function WebsitePanel({ merchant }: { merchant: PortalMerchant }) {
       setBusy(null);
     }
   }
+
+  const canGenerate = busy === null;
+  const canLock = busy === null && (lifecycle?.currentVersion ?? 0) > 0;
+  const canPublish = busy === null && website?.state !== "published";
+  const canUnpublish = busy === null && website?.state === "published";
 
   return (
     <Card>
@@ -96,14 +116,19 @@ function WebsitePanel({ merchant }: { merchant: PortalMerchant }) {
           </CardTitle>
           <CardDescription>
             {website
-              ? `${pages.length} page${pages.length === 1 ? "" : "s"} · version ${website.published_version ?? "—"} · last generated ${formatDate(website.last_generated_at)}`
+              ? `${pages.length} page${pages.length === 1 ? "" : "s"} · live revision ${lifecycle?.publishedVersion ?? "—"} · current revision ${lifecycle?.currentVersion ?? "—"} · last generated ${formatDate(website.last_generated_at)}`
               : "No website yet. Generate one from your store details."}
           </CardDescription>
         </div>
         {website ? (
-          <Badge variant={website.state === "published" ? "default" : "secondary"}>
-            {website.state}
-          </Badge>
+          <div className="flex shrink-0 items-center gap-2">
+            {lifecycle?.hasUnpublishedDraft ? (
+              <Badge variant="secondary">Draft awaiting publish</Badge>
+            ) : null}
+            <Badge variant={website.state === "published" ? "default" : "secondary"}>
+              {website.state}
+            </Badge>
+          </div>
         ) : null}
       </CardHeader>
       <CardContent className="space-y-3">
@@ -118,8 +143,32 @@ function WebsitePanel({ merchant }: { merchant: PortalMerchant }) {
             {notice.text}
           </p>
         ) : null}
+        {lifecycle && lifecycle.currentVersion > 0 ? (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span>
+              Current revision v{lifecycle.currentVersion}
+              {lifecycle.currentRevisionLocked ? (
+                <span className="ml-1 inline-flex items-center text-foreground">
+                  <Lock className="mr-0.5 size-3" /> locked
+                </span>
+              ) : null}
+            </span>
+            {lifecycle.publishedVersion > 0 ? (
+              <span>
+                {lifecycle.publishedVersion === lifecycle.currentVersion &&
+                website?.state === "published"
+                  ? "publicly published"
+                  : `publicly serves v${lifecycle.publishedVersion}`}
+                {lifecycle.liveRevisionLocked &&
+                lifecycle.publishedVersion !== lifecycle.currentVersion
+                  ? " (locked)"
+                  : ""}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" disabled={busy !== null} onClick={() => void run("generate")}>
+          <Button size="sm" disabled={!canGenerate} onClick={() => void run("generate")}>
             {busy === "generate" ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
@@ -127,10 +176,20 @@ function WebsitePanel({ merchant }: { merchant: PortalMerchant }) {
             )}
             {busy === "generate" ? "Generating…" : "Regenerate home"}
           </Button>
+          <Button size="sm" variant="outline" disabled={!canLock} onClick={() => void run("lock")}>
+            {busy === "lock" ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : lifecycle?.currentRevisionLocked ? (
+              <LockOpen className="size-4" />
+            ) : (
+              <Lock className="size-4" />
+            )}
+            {lifecycle?.currentRevisionLocked ? "Unlock revision" : "Lock revision"}
+          </Button>
           <Button
             size="sm"
             variant={website?.state === "published" ? "outline" : "default"}
-            disabled={busy !== null || website?.state === "published"}
+            disabled={!canPublish}
             onClick={() => void run("publish")}
           >
             {busy === "publish" ? (
@@ -138,12 +197,12 @@ function WebsitePanel({ merchant }: { merchant: PortalMerchant }) {
             ) : (
               <Upload className="size-4" />
             )}
-            Publish
+            Publish current revision
           </Button>
           <Button
             size="sm"
             variant="outline"
-            disabled={busy !== null || website?.state !== "published"}
+            disabled={!canUnpublish}
             onClick={() => void run("unpublish")}
           >
             {busy === "unpublish" ? (

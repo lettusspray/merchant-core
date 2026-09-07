@@ -1,4 +1,4 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 
 import { PublicMerchantPage } from "@/components/public/public-merchant-page";
 import { getPublishedPublicPageFn } from "@/lib/api/public-functions";
@@ -8,16 +8,19 @@ export const Route = createFileRoute("/p/$merchantSlug")({
   loader: async ({ params }) => {
     const slug = params.merchantSlug;
     const page = await getPublishedPublicPageFn({ data: { slug } });
-    if (!page) throw notFound();
     return { page };
   },
   head: ({ loaderData }) => {
-    const title = loaderData?.page?.website?.seoTitle ?? loaderData?.page?.merchant?.name;
+    const revision = loaderData?.page?.revision;
+    const website = loaderData?.page?.website;
+    // SEO comes from the persisted published revision — never regenerated from
+    // live merchant data at request time.
+    const title = revision?.seoTitle ?? revision?.title ?? website?.slug ?? null;
     return {
       meta: [
         ...(title ? [{ title }] : []),
-        ...(loaderData?.page?.page?.metaDescription
-          ? [{ name: "description", content: loaderData.page.page.metaDescription }]
+        ...(revision?.metaDescription
+          ? [{ name: "description", content: revision.metaDescription }]
           : []),
       ],
     };

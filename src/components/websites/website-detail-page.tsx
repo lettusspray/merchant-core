@@ -5,8 +5,10 @@ import {
   ExternalLink,
   FilePlus2,
   Globe,
+  History,
   Loader2,
   Lock,
+  LockOpen,
   TriangleAlert,
   Upload,
 } from "lucide-react";
@@ -29,6 +31,7 @@ import { useSessionState } from "@/hooks/use-session-state";
 import {
   generateHomePageFn,
   publishPageFn,
+  setHomePageLockFn,
   unpublishPageFn,
   websiteDetailFn,
 } from "@/lib/api/console.functions";
@@ -154,6 +157,7 @@ export function WebsiteDetailPage({ websiteId }: { websiteId: string }) {
   } else {
     const merchant = detail.merchant;
     const publicSlug = detail.slug ?? merchant?.slug ?? null;
+    const lifecycle = detail.lifecycle;
     content = (
       <div className="space-y-4">
         <div>
@@ -194,6 +198,32 @@ export function WebsiteDetailPage({ websiteId }: { websiteId: string }) {
                   <FilePlus2 className="size-4" />
                 )}
                 Generate home
+              </Button>
+              <Button
+                size="sm"
+                variant={lifecycle.currentRevisionLocked ? "secondary" : "outline"}
+                disabled={action !== null || lifecycle.currentVersion === 0}
+                onClick={() =>
+                  void run(
+                    lifecycle.currentRevisionLocked ? "Unlock revision" : "Lock revision",
+                    () =>
+                      setHomePageLockFn({
+                        data: {
+                          websiteId: detail.id,
+                          locked: !lifecycle.currentRevisionLocked,
+                        },
+                      }).then(() => undefined),
+                  )
+                }
+              >
+                {action === "Lock revision" || action === "Unlock revision" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : lifecycle.currentRevisionLocked ? (
+                  <LockOpen className="size-4" />
+                ) : (
+                  <Lock className="size-4" />
+                )}
+                {lifecycle.currentRevisionLocked ? "Unlock revision" : "Lock revision"}
               </Button>
               <Button
                 size="sm"
@@ -252,12 +282,44 @@ export function WebsiteDetailPage({ websiteId }: { websiteId: string }) {
             ) : null}
             <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
               <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">Id</p>
-                <p className="break-all">{detail.id}</p>
+                <p className="text-xs font-medium text-muted-foreground">Published version</p>
+                <p className="tabular-nums">
+                  {lifecycle.publishedVersion > 0 ? `v${lifecycle.publishedVersion}` : "—"}
+                </p>
               </div>
               <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">Published version</p>
-                <p>{detail.published_version}</p>
+                <p className="text-xs font-medium text-muted-foreground">Current revision</p>
+                <p className="tabular-nums">
+                  {lifecycle.currentVersion > 0
+                    ? `v${lifecycle.currentVersion} (${detail.website_pages.find((p) => p.path === "/")?.state ?? "draft"})`
+                    : "—"}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Draft awaiting publish</p>
+                <p>
+                  {lifecycle.hasUnpublishedDraft ? (
+                    <Badge variant="secondary">Yes</Badge>
+                  ) : (
+                    <span className="text-muted-foreground">No</span>
+                  )}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Revision lock</p>
+                <p>
+                  {lifecycle.currentVersion > 0 ? (
+                    lifecycle.currentRevisionLocked ? (
+                      <Badge variant="secondary">
+                        <Lock className="mr-1 size-3" /> Current locked
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">Unlocked</span>
+                    )
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs font-medium text-muted-foreground">Last generated</p>
@@ -267,22 +329,35 @@ export function WebsiteDetailPage({ websiteId }: { websiteId: string }) {
                 <p className="text-xs font-medium text-muted-foreground">Published at</p>
                 <p>{formatDate(detail.published_at)}</p>
               </div>
-            </div>
-            {merchant ? (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                <span className="text-muted-foreground">Merchant:</span>
-                <Link
-                  to="/merchants/$id"
-                  params={{ id: merchant.id }}
-                  className="font-medium text-primary hover:underline"
-                >
-                  {merchant.name}
-                </Link>
-                {merchant.tagline ? (
-                  <span className="text-muted-foreground">— {merchant.tagline}</span>
-                ) : null}
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Live revision locked</p>
+                <p>
+                  {lifecycle.liveRevisionLocked ? (
+                    <Badge variant="secondary">
+                      <Lock className="mr-1 size-3" /> v{lifecycle.publishedVersion} locked
+                    </Badge>
+                  ) : lifecycle.publishedVersion > 0 ? (
+                    <span className="text-muted-foreground">No</span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </p>
               </div>
-            ) : null}
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Merchant</p>
+                {merchant ? (
+                  <Link
+                    to="/merchants/$id"
+                    params={{ id: merchant.id }}
+                    className="font-medium text-primary hover:underline"
+                  >
+                    {merchant.name}
+                  </Link>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -290,8 +365,9 @@ export function WebsiteDetailPage({ websiteId }: { websiteId: string }) {
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Pages</CardTitle>
             <CardDescription>
-              Generate writes a draft from the current merchant graph. Publish takes it live; the
-              public page shows the published content only.
+              Generate creates a new draft revision from the current merchant graph. Publish
+              promotes it to the live revision; the public page renders exactly the published
+              revision.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
@@ -332,11 +408,67 @@ export function WebsiteDetailPage({ websiteId }: { websiteId: string }) {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <History className="size-4 text-muted-foreground" />
+              <CardTitle className="text-base">Revision history</CardTitle>
+            </div>
+            <CardDescription>
+              Every generated revision is stored immutably in website_page_versions. Locked
+              revisions are protected and never overwritten by a later regeneration.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            {detail.website_page_versions.length === 0 ? (
+              <div className="p-6 text-sm text-muted-foreground">No revisions yet.</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-right">Version</TableHead>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Created</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {detail.website_page_versions.map((version) => (
+                    <TableRow key={version.id}>
+                      <TableCell className="text-right tabular-nums">
+                        v{version.version}
+                        {version.version === lifecycle.publishedVersion &&
+                        detail.state === "published" ? (
+                          <span className="ml-1.5 text-xs text-muted-foreground">(live)</span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell>{version.title}</TableCell>
+                      <TableCell>
+                        {version.locked ? (
+                          <Badge variant="secondary">
+                            <Lock className="mr-1 size-3" /> Locked
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">Unlocked</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        {formatDate(version.created_at)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Globe className="size-3.5" />
           <span>
-            The public page renders from the merchant graph, not a parallel CMS. Regenerate any time
-            the graph changes.
+            The public page renders the persisted published revision, never live merchant data.
+            Revisions are immutable; regenerating produces a new draft on top of the published
+            revision.
           </span>
         </div>
       </div>

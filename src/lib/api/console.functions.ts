@@ -25,6 +25,7 @@ import {
   resolveTenant,
   runDiscovery,
   runMockVisibility,
+  setHomePageLock,
   systemActivity,
   tenantCategories,
   unpublishPage,
@@ -540,6 +541,7 @@ export const generateHomePageFn = createServerFn({ method: "POST" })
         merchantId: result.merchantId,
         path: "/",
         version: result.version,
+        parentVersion: result.parentVersion,
         sections: result.sectionCount,
         state: "draft",
       },
@@ -578,7 +580,35 @@ export const unpublishPageFn = createServerFn({ method: "POST" })
       kind: "website.unpublished",
       subjectType: "website",
       subjectId: data.websiteId,
-      payload: {},
+      payload: {
+        merchantId: result.merchantId,
+        unpublishedVersion: result.unpublishedVersion,
+      },
+    });
+    return { result };
+  });
+
+const pageLockSchema = z.object({ websiteId: z.string().uuid(), locked: z.boolean() });
+
+export const setHomePageLockFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => pageLockSchema.parse(input))
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    const result = await setHomePageLock(supabase, tenantId, data.websiteId, data.locked);
+    await recordEvent(supabase, {
+      tenantId,
+      actorId: context.userId,
+      kind: data.locked ? "website.locked" : "website.unlocked",
+      subjectType: "website_page",
+      subjectId: result.pageId,
+      payload: {
+        websiteId: result.websiteId,
+        merchantId: result.merchantId,
+        version: result.version,
+        locked: data.locked,
+      },
     });
     return { result };
   });

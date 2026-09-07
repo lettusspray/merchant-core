@@ -1238,6 +1238,82 @@ export type MerchantGraph = {
   }>;
 };
 
+// =============== Website Factory: homepage block representation ===============
+// The persisted `blocks` JSON on website_pages / website_page_versions. The public
+// renderer is the ONLY consumer and renders these types deterministically. Any
+// change here must keep every existing block type compatible so a stored revision
+// renders identically on every request without a regeneration pass.
+
+export type HomeHeroBlock = {
+  type: "hero";
+  name: string;
+  tagline: string | null;
+  description: string | null;
+  vertical: string | null;
+  logoUrl: string | null;
+};
+
+export type HomeHoursEntry = {
+  dayOfWeek: number;
+  opensAt: string | null;
+  closesAt: string | null;
+  isClosed: boolean;
+};
+
+export type HomeLocationItem = {
+  label: string;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  city: string | null;
+  region: string | null;
+  postalCode: string | null;
+  country: string | null;
+  phone: string | null;
+  isPrimary: boolean;
+  hours: HomeHoursEntry[];
+};
+
+export type HomeLocationsBlock = {
+  type: "locations";
+  city: string | null;
+  locationLine: string | null;
+  items: HomeLocationItem[];
+};
+
+export type HomeServicesBlock = {
+  type: "services";
+  items: Array<{
+    name: string;
+    description: string | null;
+    priceCents: number | null;
+    durationMinutes: number | null;
+  }>;
+};
+
+export type HomeProductsBlock = {
+  type: "products";
+  items: Array<{
+    name: string;
+    description: string | null;
+    priceCents: number | null;
+    currency: string | null;
+    sku: string | null;
+  }>;
+};
+
+export type HomeOffersBlock = {
+  type: "offers";
+  items: Array<{
+    title: string;
+    description: string | null;
+    discountLabel: string | null;
+    endsAt: string | null;
+  }>;
+};
+
+export type HomePageBlock =
+  HomeHeroBlock | HomeLocationsBlock | HomeServicesBlock | HomeProductsBlock | HomeOffersBlock;
+
 async function loadMerchantGraph(
   supabase: Db,
   tenantId: string,
@@ -1366,13 +1442,45 @@ export async function getWebsiteWithPages(supabase: Db, tenantId: string, websit
   const { data: website, error } = await supabase
     .from("websites")
     .select(
-      "*, merchant:merchants(id, name, slug, vertical, tagline, description), website_pages(id, path, title, kind, state, version, seo_title, meta_description, updated_at, created_at)",
+      "*, merchant:merchants(id, name, slug, vertical, tagline, description), website_pages(id, path, title, kind, state, version, locked, seo_title, meta_description, published_at, updated_at, created_at)",
     )
     .eq("tenant_id", tenantId)
     .eq("id", websiteId)
     .maybeSingle();
   if (error) throw error;
-  return website ?? null;
+  if (!website) return null;
+
+  const { data: versions, error: versionsError } = await supabase
+    .from("website_page_versions")
+    .select("id, version, title, locked, generated, created_by, created_at")
+    .eq("tenant_id", tenantId)
+    .eq("website_id", websiteId)
+    .order("version", { ascending: false });
+  if (versionsError) throw versionsError;
+
+  const pages = Array.isArray(website.website_pages) ? website.website_pages : [];
+  const home = pages.find((page) => page.path === "/") ?? null;
+  const liveVersion = website.published_version ?? 0;
+  const liveLocked = (versions ?? []).some(
+    (version) => version.version === liveVersion && version.locked,
+  );
+
+  return {
+    ...website,
+    website_page_versions: versions ?? [],
+    lifecycle: {
+      publishedState: website.state,
+      publishedVersion: liveVersion,
+      publishedAt: website.published_at,
+      lastGeneratedAt: website.last_generated_at,
+      currentVersion: home?.version ?? 0,
+      currentRevisionLocked: home?.locked ?? false,
+      liveRevisionLocked: liveLocked,
+      hasUnpublishedDraft:
+        home !== null &&
+        (website.state === "draft" || website.state === "archived" || liveVersion < home.version),
+    },
+  };
 }
 
 export async function generateHomePageFromGraph(
@@ -1397,7 +1505,7 @@ export async function generateHomePageFromGraph(
   const city = primary?.city ?? null;
   const locationLine = primary ? [primary.city, primary.region].filter(Boolean).join(", ") : null;
 
-  const blocks = [
+  const blocks: HomePageBlock[] = [
     {
       type: "hero",
       name: merchant.name,
@@ -1475,6 +1583,7 @@ export async function generateHomePageFromGraph(
 
   const now = new Date().toISOString();
   const version = (existing?.version ?? 0) + 1;
+  const parentVersion = existing?.version ?? 0;
 
   const pageFields: Database["public"]["Tables"]["website_pages"]["Insert"] = {
     tenant_id: tenantId,
@@ -1489,12 +1598,17 @@ export async function generateHomePageFromGraph(
     blocks: blocks as never,
     state: "draft",
     generated: true,
-    locked: true,
+    locked: false,
     sort_order: 0,
     version,
     updated_at: now,
   };
 
+  // The website_pages row is the current (working/latest) revision. Publishing
+  // never depends on this row's content for the public site — the immutable
+  // website_page_versions record below is what a published revision is served
+  // from — so advancing the row to a new draft does not rewrite the published
+  // representation. Locked revisions stay intact in the version history.
   const { data: page, error: pageError } = existing
     ? await supabase
         .from("website_pages")
@@ -1510,13 +1624,32 @@ export async function generateHomePageFromGraph(
         .single();
   if (pageError) throw pageError;
 
+  // Immutable revision history: every generated revision corresponds to exactly
+  // one version record carrying the full persisted representation needed to
+  // reconstruct that revision (title, body, blocks, SEO). Completing the page
+  // write AND the version insert together is what makes a revision material.
+  const { error: versionError } = await supabase.from("website_page_versions").insert([
+    {
+      tenant_id: tenantId,
+      website_id: websiteId,
+      page_id: page.id,
+      version,
+      title: merchant.name,
+      body: buildHomeBody(graph),
+      blocks: blocks as never,
+      seo_title: seoTitle,
+      meta_description: metaDescription,
+      generated: true,
+      locked: false,
+      created_by: actorId ?? null,
+    },
+  ]);
+  if (versionError) throw versionError;
+
   const { error: updateError } = await supabase
     .from("websites")
     .update({
-      state: "draft",
       last_generated_at: now,
-      seo_title: seoTitle,
-      published_at: null,
       updated_at: now,
     })
     .eq("tenant_id", tenantId)
@@ -1528,6 +1661,7 @@ export async function generateHomePageFromGraph(
     merchantId: website.merchant_id,
     page,
     version,
+    parentVersion,
     sectionCount: blocks.length,
   };
 }
@@ -1598,7 +1732,7 @@ export async function publishPage(supabase: Db, tenantId: string, websiteId: str
 
   const { data: home, error: homeError } = await supabase
     .from("website_pages")
-    .select("id, path, version")
+    .select("id, path, version, seo_title, title")
     .eq("tenant_id", tenantId)
     .eq("website_id", websiteId)
     .eq("path", "/")
@@ -1606,12 +1740,17 @@ export async function publishPage(supabase: Db, tenantId: string, websiteId: str
   if (homeError) throw homeError;
   if (!home) throw new Error("Generate a homepage before publishing.");
 
+  // Publishing selects the current working revision and makes it THE published
+  // revision. The public route serves the version record for exactly this
+  // version, so the promotion is unambiguous — a later draft revision can never
+  // shadow it, and an older revision can never be selected.
   const { error: websiteUpdateError } = await supabase
     .from("websites")
     .update({
       state: "published",
       published_at: now,
       published_version: home.version,
+      seo_title: home.seo_title ?? home.title,
       updated_at: now,
     })
     .eq("tenant_id", tenantId)
@@ -1630,12 +1769,23 @@ export async function publishPage(supabase: Db, tenantId: string, websiteId: str
 
 export async function unpublishPage(supabase: Db, tenantId: string, websiteId: string) {
   const now = new Date().toISOString();
-  const { error: websiteError } = await supabase
+  const { data: website, error: websiteError } = await supabase
+    .from("websites")
+    .select("id, merchant_id, published_version")
+    .eq("tenant_id", tenantId)
+    .eq("id", websiteId)
+    .maybeSingle();
+  if (websiteError) throw websiteError;
+  if (!website) throw new Error("Website not found");
+
+  const unpublishedVersion = website.published_version ?? 0;
+
+  const { error: updateError } = await supabase
     .from("websites")
     .update({ state: "draft", published_at: null, updated_at: now })
     .eq("tenant_id", tenantId)
     .eq("id", websiteId);
-  if (websiteError) throw websiteError;
+  if (updateError) throw updateError;
 
   const { data: home, error: fetchError } = await supabase
     .from("website_pages")
@@ -1655,13 +1805,71 @@ export async function unpublishPage(supabase: Db, tenantId: string, websiteId: s
     if (pageError) throw pageError;
   }
 
-  return { websiteId };
+  return { websiteId, merchantId: website.merchant_id, unpublishedVersion };
+}
+
+/** Marks the CURRENT working revision of the homepage as manually locked (or
+ *  unlocks it). Locked content is protected: regeneration keeps the locked
+ *  revision intact in the immutable version history and only ever produces a
+ *  new unlocked draft candidate on top of it. Both the page row (current
+ *  revision mirror) and the matching version record are updated together. */
+export async function setHomePageLock(
+  supabase: Db,
+  tenantId: string,
+  websiteId: string,
+  requestedLock: boolean,
+) {
+  const { data: website, error: websiteError } = await supabase
+    .from("websites")
+    .select("id, merchant_id")
+    .eq("tenant_id", tenantId)
+    .eq("id", websiteId)
+    .maybeSingle();
+  if (websiteError) throw websiteError;
+  if (!website) throw new Error("Website not found");
+
+  const { data: home, error: homeError } = await supabase
+    .from("website_pages")
+    .select("id, path, version, locked")
+    .eq("tenant_id", tenantId)
+    .eq("website_id", websiteId)
+    .eq("path", "/")
+    .maybeSingle();
+  if (homeError) throw homeError;
+  if (!home) throw new Error("Generate a homepage before locking it.");
+
+  const now = new Date().toISOString();
+  const { error: pageError } = await supabase
+    .from("website_pages")
+    .update({ locked: requestedLock, updated_at: now })
+    .eq("tenant_id", tenantId)
+    .eq("id", home.id);
+  if (pageError) throw pageError;
+
+  const { error: versionError } = await supabase
+    .from("website_page_versions")
+    .update({ locked: requestedLock })
+    .eq("tenant_id", tenantId)
+    .eq("website_id", websiteId)
+    .eq("page_id", home.id)
+    .eq("version", home.version);
+  if (versionError) throw versionError;
+
+  return {
+    websiteId,
+    merchantId: website.merchant_id,
+    pageId: home.id,
+    version: home.version,
+    locked: requestedLock,
+  };
 }
 
 export async function getPublishedPublicPage(supabase: Db, slug: string) {
+  // Route resolution: the merchant slug identifies the site. Everything the
+  // public page actually displays comes from the persisted published revision.
   const { data: merchant, error: merchantError } = await supabase
     .from("merchants")
-    .select("id, name, slug, tagline, description, vertical, logo_url")
+    .select("id, slug")
     .eq("slug", slug)
     .maybeSingle();
   if (merchantError) throw merchantError;
@@ -1669,50 +1877,26 @@ export async function getPublishedPublicPage(supabase: Db, slug: string) {
 
   const { data: website, error: websiteError } = await supabase
     .from("websites")
-    .select("id, slug, state, theme, published_version, published_at, updated_at, seo_title")
+    .select("id, slug, state, theme, published_version, published_at, updated_at")
     .eq("merchant_id", merchant.id)
     .eq("state", "published")
     .maybeSingle();
   if (websiteError) throw websiteError;
-  if (!website) return null;
+  if (!website || !website.published_version || website.published_version < 1) return null;
 
-  const { data: pages, error: pagesError } = await supabase
-    .from("website_pages")
-    .select("id, path, title, state, version, seo_title, meta_description")
+  // Publication lookup: the exact live revision. The version record is the
+  // authoritative persisted representation — never the website_pages working
+  // row (which may be a newer, unpublished draft) and never live merchant data.
+  const { data: revision, error: revisionError } = await supabase
+    .from("website_page_versions")
+    .select(
+      "id, version, title, body, blocks, seo_title, meta_description, locked, generated, created_at",
+    )
     .eq("website_id", website.id)
-    .eq("state", "published");
-  if (pagesError) throw pagesError;
-
-  const page = (pages ?? []).find((candidate) => candidate.path === "/");
-  if (!page) return null;
-
-  const [locations, products, services, offers] = await Promise.all([
-    supabase
-      .from("locations")
-      .select(
-        "id, label, address_line1, address_line2, city, region, postal_code, country, phone, is_primary, business_hours(id, day_of_week, opens_at, closes_at, is_closed)",
-      )
-      .eq("merchant_id", merchant.id)
-      .order("is_primary", { ascending: false }),
-    supabase
-      .from("products")
-      .select("id, name, description, price_cents, currency, sku")
-      .eq("merchant_id", merchant.id)
-      .eq("state", "published")
-      .order("name"),
-    supabase
-      .from("services")
-      .select("id, name, description, price_cents, duration_minutes")
-      .eq("merchant_id", merchant.id)
-      .eq("state", "published")
-      .order("name"),
-    supabase
-      .from("offers")
-      .select("id, title, description, discount_label, ends_at")
-      .eq("merchant_id", merchant.id)
-      .eq("state", "published")
-      .order("created_at", { ascending: false }),
-  ]);
+    .eq("version", website.published_version)
+    .maybeSingle();
+  if (revisionError) throw revisionError;
+  if (!revision) return null;
 
   return {
     website: {
@@ -1723,22 +1907,19 @@ export async function getPublishedPublicPage(supabase: Db, slug: string) {
       publishedVersion: website.published_version,
       publishedAt: website.published_at,
       updatedAt: website.updated_at,
-      seoTitle: website.seo_title,
     },
-    merchant,
-    page: {
-      id: page.id,
-      path: page.path,
-      title: page.title,
-      state: page.state,
-      version: page.version,
-      seoTitle: page.seo_title,
-      metaDescription: page.meta_description,
+    revision: {
+      id: revision.id,
+      version: revision.version,
+      title: revision.title,
+      body: revision.body,
+      blocks: Array.isArray(revision.blocks) ? revision.blocks : [],
+      seoTitle: revision.seo_title,
+      metaDescription: revision.meta_description,
+      locked: revision.locked,
+      generated: revision.generated,
+      createdAt: revision.created_at,
     },
-    locations: locations.data ?? [],
-    products: products.data ?? [],
-    services: services.data ?? [],
-    offers: offers.data ?? [],
   };
 }
 

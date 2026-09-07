@@ -16,6 +16,7 @@ import {
   recordEvent,
   resolveManageableMerchant,
   saveLocationWithHours,
+  setHomePageLock,
   unpublishPage,
   updateMerchantProfile,
   upsertCatalogItem,
@@ -414,6 +415,7 @@ export const portalGenerateHomeFn = createServerFn({ method: "POST" })
         merchantId: result.merchantId,
         path: "/",
         version: result.version,
+        parentVersion: result.parentVersion,
         sections: result.sectionCount,
         state: "draft",
       },
@@ -455,7 +457,34 @@ export const portalUnpublishFn = createServerFn({ method: "POST" })
       kind: "website.unpublished",
       subjectType: "website",
       subjectId: website.id,
-      payload: {},
+      payload: { merchantId: result.merchantId, unpublishedVersion: result.unpublishedVersion },
+    });
+    return { result };
+  });
+
+export const portalSetHomePageLockFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) =>
+    z.object({ merchantId: z.string().uuid(), locked: z.boolean() }).parse(input),
+  )
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase;
+    const { tenantId } = await resolveManageableMerchant(supabase, context.userId, data.merchantId);
+    const website = await findWebsiteForMerchant(supabase, tenantId, data.merchantId);
+    if (!website) return { result: null };
+    const result = await setHomePageLock(supabase, tenantId, website.id, data.locked);
+    await recordEvent(supabase, {
+      tenantId,
+      actorId: context.userId,
+      kind: data.locked ? "website.locked" : "website.unlocked",
+      subjectType: "website_page",
+      subjectId: result.pageId,
+      payload: {
+        websiteId: result.websiteId,
+        merchantId: result.merchantId,
+        version: result.version,
+        locked: data.locked,
+      },
     });
     return { result };
   });
