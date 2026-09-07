@@ -310,6 +310,7 @@ export async function merchantDetail(supabase: Db, tenantId: string, merchantId:
     offers,
     observations,
     happenings,
+    owners,
     websites,
     visibility,
     orders,
@@ -334,6 +335,7 @@ export async function merchantDetail(supabase: Db, tenantId: string, merchantId:
       .match(eq)
       .order("observed_at", { ascending: false }),
     supabase.from("happenings").select("*").match(eq).order("created_at", { ascending: false }),
+    supabase.from("merchant_owners").select("*").match(eq),
     supabase
       .from("websites")
       .select("*, website_pages(id, path, title, state, meta_description, updated_at)")
@@ -371,6 +373,7 @@ export async function merchantDetail(supabase: Db, tenantId: string, merchantId:
     offers: offers.data ?? [],
     observations: observations.data ?? [],
     happenings: happenings.data ?? [],
+    owners: owners.data ?? [],
     websites: websites.data ?? [],
     visibility: visibility.data ?? [],
     orders: orders.data ?? [],
@@ -1291,6 +1294,17 @@ async function loadMerchantGraph(
   };
 }
 
+export async function findWebsiteForMerchant(supabase: Db, tenantId: string, merchantId: string) {
+  const { data, error } = await supabase
+    .from("websites")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("merchant_id", merchantId)
+    .maybeSingle();
+  if (error) throw error;
+  return data ?? null;
+}
+
 export async function ensureWebsiteForMerchant(supabase: Db, tenantId: string, merchantId: string) {
   const { data: existing, error: existingError } = await supabase
     .from("websites")
@@ -1719,4 +1733,342 @@ export async function getPublishedPublicPage(supabase: Db, slug: string) {
     services: services.data ?? [],
     offers: offers.data ?? [],
   };
+}
+
+// =============== MERCHANT PORTAL ===============
+
+export const HAPPENING_KINDS = [
+  "event",
+  "promotion",
+  "announcement",
+  "menu_change",
+  "hours_change",
+] as const;
+export type HappeningKind = (typeof HAPPENING_KINDS)[number];
+
+/** Resolves the tenant for a merchant that the caller may manage — either as a
+ *  linked store owner (merchant_owners) or as an operator via workspace
+ *  membership. Portal server functions must authorize through here, never the
+ *  raw tenant, so owners are scoped strictly to their own merchant. */
+export async function resolveManageableMerchant(
+  supabase: Db,
+  userId: string,
+  merchantId: string,
+): Promise<{ tenantId: string; merchant: { id: string; name: string } }> {
+  const { data: owner, error: ownerError } = await supabase
+    .from("merchant_owners")
+    .select("tenant_id")
+    .eq("user_id", userId)
+    .eq("merchant_id", merchantId)
+    .maybeSingle();
+  if (ownerError) throw ownerError;
+
+  if (owner) {
+    const merchant = await getTenantMerchant(supabase, owner.tenant_id, merchantId);
+    return { tenantId: owner.tenant_id, merchant };
+  }
+
+  const tenantId = await resolveTenant(supabase);
+  const merchant = await getTenantMerchant(supabase, tenantId, merchantId);
+  return { tenantId, merchant };
+}
+
+async function getTenantMerchant(
+  supabase: Db,
+  tenantId: string,
+  merchantId: string,
+): Promise<{ id: string; name: string }> {
+  const { data, error } = await supabase
+    .from("merchants")
+    .select("id, name")
+    .eq("tenant_id", tenantId)
+    .eq("id", merchantId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("Merchant not found");
+  return data;
+}
+
+/** Resolves the caller's owned merchants. Pending invites (invited by email,
+ *  not yet claimed) are claimed automatically when the signed-in user's email
+ *  matches, so a merchant who simply opens the portal with the invited email
+ *  is linked without operator action. */
+export async function merchantPortalContext(supabase: Db, userId: string) {
+  const { data: user, error: userError } = await supabase.auth.getUser();
+  if (userError) throw userError;
+  const email = user.user?.email ?? null;
+
+  if (email) {
+    const { error: claimError } = await supabase
+      .from("merchant_owners")
+      .update({ user_id: userId })
+      .ilike("email", email)
+      .is("user_id", null);
+    if (claimError) throw claimError;
+  }
+
+  const { data: owned, error: ownedError } = await supabase
+    .from("merchant_owners")
+    .select("tenant_id, merchant_id")
+    .eq("user_id", userId);
+  if (ownedError) throw ownedError;
+
+  const merchants = [];
+  for (const owner of owned ?? []) {
+    const detail = await merchantDetail(supabase, owner.tenant_id, owner.merchant_id);
+    const website = (detail.websites ?? [])[0];
+    let websitePages: Awaited<ReturnType<typeof getWebsiteWithPages>> = null;
+    if (website) {
+      websitePages = await getWebsiteWithPages(supabase, owner.tenant_id, website.id);
+    }
+    merchants.push({ ...detail, websitePages });
+  }
+
+  let operator = false;
+  try {
+    await resolveTenant(supabase);
+    operator = true;
+  } catch {
+    operator = false;
+  }
+
+  return { merchants, operator };
+}
+
+export type MerchantProfileInput = {
+  name: string;
+  tagline: string | null;
+  description: string | null;
+  logo_url: string | null;
+  brand_color: string | null;
+};
+
+/** Merchant self-service identity update. Unlike the operator identity edit,
+ *  store owners cannot change slugs, verticals, statuses, or categories. */
+export async function updateMerchantProfile(
+  supabase: Db,
+  tenantId: string,
+  merchantId: string,
+  input: MerchantProfileInput,
+) {
+  const { data, error } = await supabase
+    .from("merchants")
+    .update({
+      name: input.name,
+      tagline: input.tagline,
+      description: input.description,
+      logo_url: input.logo_url,
+      brand_color: input.brand_color,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("tenant_id", tenantId)
+    .eq("id", merchantId)
+    .select("id, name, slug, tagline, description, logo_url, brand_color")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("Merchant not found");
+  return data;
+}
+
+type HoursEntry = {
+  day_of_week: number;
+  opens_at: string | null;
+  closes_at: string | null;
+  is_closed: boolean;
+};
+
+/** Saves a location (create or update) and replaces its business hours in one
+ *  call so the public site always reflects consistent hours. */
+export async function saveLocationWithHours(
+  supabase: Db,
+  tenantId: string,
+  merchantId: string,
+  locationId: string | null,
+  input: LocationInput,
+  hours: HoursEntry[],
+) {
+  const { location } = await upsertLocation(supabase, tenantId, merchantId, locationId, input);
+
+  const { error: deleteError } = await supabase
+    .from("business_hours")
+    .delete()
+    .eq("tenant_id", tenantId)
+    .eq("location_id", location.id);
+  if (deleteError) throw deleteError;
+
+  if (hours.length > 0) {
+    const { error: insertError } = await supabase.from("business_hours").insert(
+      hours.map((hour) => ({
+        tenant_id: tenantId,
+        location_id: location.id,
+        day_of_week: hour.day_of_week,
+        opens_at: hour.opens_at,
+        closes_at: hour.closes_at,
+        is_closed: hour.is_closed,
+      })),
+    );
+    if (insertError) throw insertError;
+  }
+
+  return { location };
+}
+
+export async function deleteLocationRow(
+  supabase: Db,
+  tenantId: string,
+  merchantId: string,
+  locationId: string,
+) {
+  const { error } = await supabase
+    .from("locations")
+    .delete()
+    .eq("tenant_id", tenantId)
+    .eq("merchant_id", merchantId)
+    .eq("id", locationId);
+  if (error) throw error;
+}
+
+export type OfferInput = {
+  title: string;
+  description: string | null;
+  discount_label: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  state: PublishState;
+};
+
+export async function upsertOffer(
+  supabase: Db,
+  tenantId: string,
+  merchantId: string,
+  offerId: string | null,
+  input: OfferInput,
+) {
+  const payload = {
+    title: input.title,
+    description: input.description,
+    discount_label: input.discount_label,
+    starts_at: input.starts_at,
+    ends_at: input.ends_at,
+    state: input.state,
+    updated_at: new Date().toISOString(),
+  };
+  if (offerId) {
+    const { data, error } = await supabase
+      .from("offers")
+      .update(payload)
+      .eq("tenant_id", tenantId)
+      .eq("merchant_id", merchantId)
+      .eq("id", offerId)
+      .select("*")
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error("Offer not found");
+    return { offer: data, created: false };
+  }
+  const { data, error } = await supabase
+    .from("offers")
+    .insert({ tenant_id: tenantId, merchant_id: merchantId, ...payload })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return { offer: data, created: true };
+}
+
+export async function deleteOfferRow(
+  supabase: Db,
+  tenantId: string,
+  merchantId: string,
+  offerId: string,
+) {
+  const { error } = await supabase
+    .from("offers")
+    .delete()
+    .eq("tenant_id", tenantId)
+    .eq("merchant_id", merchantId)
+    .eq("id", offerId);
+  if (error) throw error;
+}
+
+export type HappeningInput = {
+  kind: HappeningKind;
+  title: string;
+  body: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  status: "draft" | "published";
+};
+
+/** Merchant self-service happening upsert. Publishing is seamless: the row is
+ *  marked published immediately and published_at is stamped. */
+export async function upsertHappeningRow(
+  supabase: Db,
+  tenantId: string,
+  merchantId: string,
+  happeningId: string | null,
+  input: HappeningInput,
+) {
+  const now = new Date().toISOString();
+  const payload = {
+    kind: input.kind,
+    title: input.title,
+    body: input.body,
+    starts_at: input.starts_at,
+    ends_at: input.ends_at,
+    status: input.status,
+    published_at: input.status === "published" ? now : null,
+    updated_at: now,
+  };
+  if (happeningId) {
+    const { data, error } = await supabase
+      .from("happenings")
+      .update(payload)
+      .eq("tenant_id", tenantId)
+      .eq("merchant_id", merchantId)
+      .eq("id", happeningId)
+      .select("*")
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error("Happening not found");
+    return { happening: data, created: false };
+  }
+  const { data, error } = await supabase
+    .from("happenings")
+    .insert({ tenant_id: tenantId, merchant_id: merchantId, ...payload })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return { happening: data, created: true };
+}
+
+export async function deleteHappeningRow(
+  supabase: Db,
+  tenantId: string,
+  merchantId: string,
+  happeningId: string,
+) {
+  const { error } = await supabase
+    .from("happenings")
+    .delete()
+    .eq("tenant_id", tenantId)
+    .eq("merchant_id", merchantId)
+    .eq("id", happeningId);
+  if (error) throw error;
+}
+
+export async function deleteCatalogItem(
+  supabase: Db,
+  tenantId: string,
+  merchantId: string,
+  kind: "product" | "service",
+  itemId: string,
+) {
+  const table = kind === "product" ? "products" : "services";
+  const { error } = await supabase
+    .from(table)
+    .delete()
+    .eq("tenant_id", tenantId)
+    .eq("merchant_id", merchantId)
+    .eq("id", itemId);
+  if (error) throw error;
 }

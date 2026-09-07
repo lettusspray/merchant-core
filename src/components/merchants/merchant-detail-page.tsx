@@ -29,6 +29,7 @@ import { EditCatalogDialog } from "@/components/merchants/edit-catalog-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -43,6 +44,7 @@ import { useSessionState } from "@/hooks/use-session-state";
 import {
   ensureWebsiteForMerchantFn,
   generateHomePageFn,
+  linkMerchantOwnerFn,
   merchantDetailFn,
 } from "@/lib/api/console.functions";
 
@@ -326,8 +328,84 @@ function WebsiteCard({ detail, onSaved }: { detail: Detail; onSaved: () => void 
             </Button>
           </>
         )}
+        <OwnerInvite
+          merchantId={detail.merchant.id}
+          owners={detail.owners ?? []}
+          onSaved={onSaved}
+        />
       </CardContent>
     </Card>
+  );
+}
+
+function OwnerInvite({
+  merchantId,
+  owners,
+  onSaved,
+}: {
+  merchantId: string;
+  owners: Array<{ id: string; email: string; user_id: string | null }>;
+  onSaved: () => void | Promise<void>;
+}) {
+  const [email, setEmail] = useState("");
+  const [inviting, setInviting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function invite() {
+    const value = email.trim();
+    if (!value) return;
+    setError(null);
+    setInviting(true);
+    try {
+      await linkMerchantOwnerFn({ data: { merchantId, email: value } });
+      setEmail("");
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not invite the owner.");
+    } finally {
+      setInviting(false);
+    }
+  }
+
+  return (
+    <div className="rounded-md border bg-muted/30 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-medium text-muted-foreground">Store portal owners</p>
+        <Link to="/portal" className="text-xs text-primary hover:underline">
+          Open /portal
+        </Link>
+      </div>
+      {owners.length > 0 ? (
+        <ul className="mt-2 space-y-1">
+          {owners.map((owner) => (
+            <li key={owner.id} className="flex items-center justify-between gap-2 text-sm">
+              <span className="truncate">{owner.email}</span>
+              <Badge variant={owner.user_id ? "default" : "secondary"}>
+                {owner.user_id ? "Active" : "Invited"}
+              </Badge>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-2 text-xs text-muted-foreground">
+          No owners linked. Invite the store owner to open the portal at <code>/portal</code> and
+          run the store themselves.
+        </p>
+      )}
+      <div className="mt-3 flex items-center gap-2">
+        <Input
+          type="email"
+          placeholder="owner@example.com"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          className="h-8"
+        />
+        <Button size="sm" variant="outline" disabled={inviting} onClick={() => void invite()}>
+          {inviting ? "Inviting…" : "Invite"}
+        </Button>
+      </div>
+      {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
+    </div>
   );
 }
 

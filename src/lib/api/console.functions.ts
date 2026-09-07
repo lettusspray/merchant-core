@@ -582,3 +582,39 @@ export const unpublishPageFn = createServerFn({ method: "POST" })
     });
     return { result };
   });
+
+export const linkMerchantOwnerFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) =>
+    z.object({ merchantId: z.string().uuid(), email: z.string().email() }).parse(input),
+  )
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    const { data: merchant, error: merchantError } = await supabase
+      .from("merchants")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("id", data.merchantId)
+      .maybeSingle();
+    if (merchantError) throw merchantError;
+    if (!merchant) throw new Error("Merchant not found");
+
+    const email = data.email.trim().toLowerCase();
+    const { error } = await supabase.from("merchant_owners").insert({
+      tenant_id: tenantId,
+      merchant_id: data.merchantId,
+      email,
+      role: "owner",
+    });
+    if (error) throw error;
+    await recordEvent(supabase, {
+      tenantId,
+      actorId: context.userId,
+      kind: "merchant.portal.invited",
+      subjectType: "merchant",
+      subjectId: data.merchantId,
+      payload: { email },
+    });
+    return { ok: true };
+  });

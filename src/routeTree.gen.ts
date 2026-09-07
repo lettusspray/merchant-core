@@ -14,6 +14,7 @@ import { Route as CommerceRouteImport } from './routes/commerce'
 import { Route as DiscoveryRouteImport } from './routes/discovery'
 import { Route as HappeningsRouteImport } from './routes/happenings'
 import { Route as MerchantsRouteImport } from './routes/merchants'
+import { Route as PortalRouteImport } from './routes/portal'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SigninRouteImport } from './routes/signin'
 import { Route as SystemRouteImport } from './routes/system'
@@ -21,6 +22,13 @@ import { Route as VisibilityRouteImport } from './routes/visibility'
 import { Route as WebsitesRouteImport } from './routes/websites'
 import { Route as MerchantsIdRouteImport } from './routes/merchants.$id'
 import { Route as PMerchantSlugRouteImport } from './routes/p.$merchantSlug'
+import { Route as PortalIndexRouteImport } from './routes/portal.index'
+import { Route as PortalHappeningsRouteImport } from './routes/portal.happenings'
+import { Route as PortalLocationsRouteImport } from './routes/portal.locations'
+import { Route as PortalOffersRouteImport } from './routes/portal.offers'
+import { Route as PortalProductsRouteImport } from './routes/portal.products'
+import { Route as PortalProfileRouteImport } from './routes/portal.profile'
+import { Route as PortalServicesRouteImport } from './routes/portal.services'
 import { Route as WebsitesIdRouteImport } from './routes/websites.$id'
 
 const IndexRoute = IndexRouteImport.update({
@@ -46,6 +54,11 @@ const HappeningsRoute = HappeningsRouteImport.update({
 const MerchantsRoute = MerchantsRouteImport.update({
   id: '/merchants',
   path: '/merchants',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortalRoute = PortalRouteImport.update({
+  id: '/portal',
+  path: '/portal',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -83,6 +96,41 @@ const PMerchantSlugRoute = PMerchantSlugRouteImport.update({
   path: '/p/$merchantSlug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PortalIndexRoute = PortalIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PortalRoute,
+} as any)
+const PortalHappeningsRoute = PortalHappeningsRouteImport.update({
+  id: '/happenings',
+  path: '/happenings',
+  getParentRoute: () => PortalRoute,
+} as any)
+const PortalLocationsRoute = PortalLocationsRouteImport.update({
+  id: '/locations',
+  path: '/locations',
+  getParentRoute: () => PortalRoute,
+} as any)
+const PortalOffersRoute = PortalOffersRouteImport.update({
+  id: '/offers',
+  path: '/offers',
+  getParentRoute: () => PortalRoute,
+} as any)
+const PortalProductsRoute = PortalProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
+  getParentRoute: () => PortalRoute,
+} as any)
+const PortalProfileRoute = PortalProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => PortalRoute,
+} as any)
+const PortalServicesRoute = PortalServicesRouteImport.update({
+  id: '/services',
+  path: '/services',
+  getParentRoute: () => PortalRoute,
+} as any)
 const WebsitesIdRoute = WebsitesIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -95,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/discovery': typeof DiscoveryRoute
   '/happenings': typeof HappeningsRoute
   '/merchants': typeof MerchantsRouteWithChildren
+  '/portal': typeof PortalRouteWithChildren
   '/settings': typeof SettingsRoute
   '/signin': typeof SigninRoute
   '/system': typeof SystemRoute
@@ -102,7 +151,14 @@ export interface FileRoutesByFullPath {
   '/websites': typeof WebsitesRouteWithChildren
   '/merchants/$id': typeof MerchantsIdRoute
   '/p/$merchantSlug': typeof PMerchantSlugRoute
+  '/portal/happenings': typeof PortalHappeningsRoute
+  '/portal/locations': typeof PortalLocationsRoute
+  '/portal/offers': typeof PortalOffersRoute
+  '/portal/products': typeof PortalProductsRoute
+  '/portal/profile': typeof PortalProfileRoute
+  '/portal/services': typeof PortalServicesRoute
   '/websites/$id': typeof WebsitesIdRoute
+  '/portal/': typeof PortalIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -117,7 +173,14 @@ export interface FileRoutesByTo {
   '/websites': typeof WebsitesRouteWithChildren
   '/merchants/$id': typeof MerchantsIdRoute
   '/p/$merchantSlug': typeof PMerchantSlugRoute
+  '/portal/happenings': typeof PortalHappeningsRoute
+  '/portal/locations': typeof PortalLocationsRoute
+  '/portal/offers': typeof PortalOffersRoute
+  '/portal/products': typeof PortalProductsRoute
+  '/portal/profile': typeof PortalProfileRoute
+  '/portal/services': typeof PortalServicesRoute
   '/websites/$id': typeof WebsitesIdRoute
+  '/portal': typeof PortalIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -126,6 +189,7 @@ export interface FileRoutesById {
   '/discovery': typeof DiscoveryRoute
   '/happenings': typeof HappeningsRoute
   '/merchants': typeof MerchantsRouteWithChildren
+  '/portal': typeof PortalRouteWithChildren
   '/settings': typeof SettingsRoute
   '/signin': typeof SigninRoute
   '/system': typeof SystemRoute
@@ -133,7 +197,14 @@ export interface FileRoutesById {
   '/websites': typeof WebsitesRouteWithChildren
   '/merchants/$id': typeof MerchantsIdRoute
   '/p/$merchantSlug': typeof PMerchantSlugRoute
+  '/portal/happenings': typeof PortalHappeningsRoute
+  '/portal/locations': typeof PortalLocationsRoute
+  '/portal/offers': typeof PortalOffersRoute
+  '/portal/products': typeof PortalProductsRoute
+  '/portal/profile': typeof PortalProfileRoute
+  '/portal/services': typeof PortalServicesRoute
   '/websites/$id': typeof WebsitesIdRoute
+  '/portal/': typeof PortalIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -143,6 +214,7 @@ export interface FileRouteTypes {
     | '/discovery'
     | '/happenings'
     | '/merchants'
+    | '/portal'
     | '/settings'
     | '/signin'
     | '/system'
@@ -150,7 +222,14 @@ export interface FileRouteTypes {
     | '/websites'
     | '/merchants/$id'
     | '/p/$merchantSlug'
+    | '/portal/happenings'
+    | '/portal/locations'
+    | '/portal/offers'
+    | '/portal/products'
+    | '/portal/profile'
+    | '/portal/services'
     | '/websites/$id'
+    | '/portal/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -165,7 +244,14 @@ export interface FileRouteTypes {
     | '/websites'
     | '/merchants/$id'
     | '/p/$merchantSlug'
+    | '/portal/happenings'
+    | '/portal/locations'
+    | '/portal/offers'
+    | '/portal/products'
+    | '/portal/profile'
+    | '/portal/services'
     | '/websites/$id'
+    | '/portal'
   id:
     | '__root__'
     | '/'
@@ -173,6 +259,7 @@ export interface FileRouteTypes {
     | '/discovery'
     | '/happenings'
     | '/merchants'
+    | '/portal'
     | '/settings'
     | '/signin'
     | '/system'
@@ -180,7 +267,14 @@ export interface FileRouteTypes {
     | '/websites'
     | '/merchants/$id'
     | '/p/$merchantSlug'
+    | '/portal/happenings'
+    | '/portal/locations'
+    | '/portal/offers'
+    | '/portal/products'
+    | '/portal/profile'
+    | '/portal/services'
     | '/websites/$id'
+    | '/portal/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -189,6 +283,7 @@ export interface RootRouteChildren {
   DiscoveryRoute: typeof DiscoveryRoute
   HappeningsRoute: typeof HappeningsRoute
   MerchantsRoute: typeof MerchantsRouteWithChildren
+  PortalRoute: typeof PortalRouteWithChildren
   SettingsRoute: typeof SettingsRoute
   SigninRoute: typeof SigninRoute
   SystemRoute: typeof SystemRoute
@@ -232,6 +327,13 @@ declare module '@tanstack/react-router' {
       path: '/merchants'
       fullPath: '/merchants'
       preLoaderRoute: typeof MerchantsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portal': {
+      id: '/portal'
+      path: '/portal'
+      fullPath: '/portal'
+      preLoaderRoute: typeof PortalRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -283,6 +385,55 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PMerchantSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/portal/': {
+      id: '/portal/'
+      path: '/'
+      fullPath: '/portal/'
+      preLoaderRoute: typeof PortalIndexRouteImport
+      parentRoute: typeof PortalRoute
+    }
+    '/portal/happenings': {
+      id: '/portal/happenings'
+      path: '/happenings'
+      fullPath: '/portal/happenings'
+      preLoaderRoute: typeof PortalHappeningsRouteImport
+      parentRoute: typeof PortalRoute
+    }
+    '/portal/locations': {
+      id: '/portal/locations'
+      path: '/locations'
+      fullPath: '/portal/locations'
+      preLoaderRoute: typeof PortalLocationsRouteImport
+      parentRoute: typeof PortalRoute
+    }
+    '/portal/offers': {
+      id: '/portal/offers'
+      path: '/offers'
+      fullPath: '/portal/offers'
+      preLoaderRoute: typeof PortalOffersRouteImport
+      parentRoute: typeof PortalRoute
+    }
+    '/portal/products': {
+      id: '/portal/products'
+      path: '/products'
+      fullPath: '/portal/products'
+      preLoaderRoute: typeof PortalProductsRouteImport
+      parentRoute: typeof PortalRoute
+    }
+    '/portal/profile': {
+      id: '/portal/profile'
+      path: '/profile'
+      fullPath: '/portal/profile'
+      preLoaderRoute: typeof PortalProfileRouteImport
+      parentRoute: typeof PortalRoute
+    }
+    '/portal/services': {
+      id: '/portal/services'
+      path: '/services'
+      fullPath: '/portal/services'
+      preLoaderRoute: typeof PortalServicesRouteImport
+      parentRoute: typeof PortalRoute
+    }
     '/websites/$id': {
       id: '/websites/$id'
       path: '/$id'
@@ -305,6 +456,29 @@ const MerchantsRouteWithChildren = MerchantsRoute._addFileChildren(
   MerchantsRouteChildren,
 )
 
+interface PortalRouteChildren {
+  PortalHappeningsRoute: typeof PortalHappeningsRoute
+  PortalLocationsRoute: typeof PortalLocationsRoute
+  PortalOffersRoute: typeof PortalOffersRoute
+  PortalProductsRoute: typeof PortalProductsRoute
+  PortalProfileRoute: typeof PortalProfileRoute
+  PortalServicesRoute: typeof PortalServicesRoute
+  PortalIndexRoute: typeof PortalIndexRoute
+}
+
+const PortalRouteChildren: PortalRouteChildren = {
+  PortalHappeningsRoute: PortalHappeningsRoute,
+  PortalLocationsRoute: PortalLocationsRoute,
+  PortalOffersRoute: PortalOffersRoute,
+  PortalProductsRoute: PortalProductsRoute,
+  PortalProfileRoute: PortalProfileRoute,
+  PortalServicesRoute: PortalServicesRoute,
+  PortalIndexRoute: PortalIndexRoute,
+}
+
+const PortalRouteWithChildren =
+  PortalRoute._addFileChildren(PortalRouteChildren)
+
 interface WebsitesRouteChildren {
   WebsitesIdRoute: typeof WebsitesIdRoute
 }
@@ -323,6 +497,7 @@ const rootRouteChildren: RootRouteChildren = {
   DiscoveryRoute: DiscoveryRoute,
   HappeningsRoute: HappeningsRoute,
   MerchantsRoute: MerchantsRouteWithChildren,
+  PortalRoute: PortalRouteWithChildren,
   SettingsRoute: SettingsRoute,
   SigninRoute: SigninRoute,
   SystemRoute: SystemRoute,
