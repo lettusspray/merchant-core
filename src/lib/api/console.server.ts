@@ -1171,3 +1171,552 @@ export async function runDiscovery(
     };
   }
 }
+
+// =============== WEBSITE FACTORY ===============
+
+export type MerchantGraph = {
+  merchant: {
+    id: string;
+    name: string;
+    slug: string;
+    vertical: string;
+    tagline: string | null;
+    description: string | null;
+    logo_url: string | null;
+    brand_color: string | null;
+  };
+  locations: Array<{
+    id: string;
+    label: string;
+    address_line1: string | null;
+    address_line2: string | null;
+    city: string | null;
+    region: string | null;
+    postal_code: string | null;
+    country: string | null;
+    phone: string | null;
+    is_primary: boolean;
+    business_hours: Array<{
+      id: string;
+      day_of_week: number;
+      opens_at: string | null;
+      closes_at: string | null;
+      is_closed: boolean;
+    }>;
+  }>;
+  products: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    price_cents: number | null;
+    currency: string;
+    sku: string | null;
+  }>;
+  services: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    price_cents: number | null;
+    duration_minutes: number | null;
+  }>;
+  offers: Array<{
+    id: string;
+    title: string;
+    description: string | null;
+    discount_label: string | null;
+    ends_at: string | null;
+  }>;
+};
+
+async function loadMerchantGraph(
+  supabase: Db,
+  tenantId: string,
+  merchantId: string,
+): Promise<MerchantGraph> {
+  const { data: merchant, error: merchantError } = await supabase
+    .from("merchants")
+    .select("id, name, slug, vertical, tagline, description, logo_url, brand_color")
+    .eq("tenant_id", tenantId)
+    .eq("id", merchantId)
+    .single();
+  if (merchantError) throw merchantError;
+
+  const { data: locations, error: locationsError } = await supabase
+    .from("locations")
+    .select("*, business_hours(id, day_of_week, opens_at, closes_at, is_closed)")
+    .eq("tenant_id", tenantId)
+    .eq("merchant_id", merchantId)
+    .order("is_primary", { ascending: false });
+  if (locationsError) throw locationsError;
+
+  const { data: products, error: productsError } = await supabase
+    .from("products")
+    .select("id, name, description, price_cents, currency, sku")
+    .eq("tenant_id", tenantId)
+    .eq("merchant_id", merchantId)
+    .eq("state", "published")
+    .order("name");
+  if (productsError) throw productsError;
+
+  const { data: services, error: servicesError } = await supabase
+    .from("services")
+    .select("id, name, description, price_cents, duration_minutes")
+    .eq("tenant_id", tenantId)
+    .eq("merchant_id", merchantId)
+    .eq("state", "published")
+    .order("name");
+  if (servicesError) throw servicesError;
+
+  const { data: offers, error: offersError } = await supabase
+    .from("offers")
+    .select("id, title, description, discount_label, ends_at")
+    .eq("tenant_id", tenantId)
+    .eq("merchant_id", merchantId)
+    .eq("state", "published")
+    .order("created_at", { ascending: false });
+  if (offersError) throw offersError;
+
+  return {
+    merchant: merchant,
+    locations: (locations ?? []) as MerchantGraph["locations"],
+    products: products ?? [],
+    services: services ?? [],
+    offers: (offers ?? []).map((offer) => ({
+      id: offer.id,
+      title: offer.title,
+      description: offer.description,
+      discount_label: offer.discount_label,
+      ends_at: offer.ends_at,
+    })),
+  };
+}
+
+export async function ensureWebsiteForMerchant(supabase: Db, tenantId: string, merchantId: string) {
+  const { data: existing, error: existingError } = await supabase
+    .from("websites")
+    .select("id, slug, state")
+    .eq("tenant_id", tenantId)
+    .eq("merchant_id", merchantId)
+    .maybeSingle();
+  if (existingError) throw existingError;
+  if (existing) return existing.id;
+
+  const { data: merchant, error: merchantError } = await supabase
+    .from("merchants")
+    .select("name, slug")
+    .eq("tenant_id", tenantId)
+    .eq("id", merchantId)
+    .single();
+  if (merchantError) throw merchantError;
+
+  const { data: website, error: websiteError } = await supabase
+    .from("websites")
+    .insert({
+      tenant_id: tenantId,
+      merchant_id: merchantId,
+      domain: `${merchant.slug}.local`,
+      slug: merchant.slug,
+      theme: "classic",
+      state: "draft",
+      seo_title: merchant.name,
+    })
+    .select("id")
+    .single();
+  if (websiteError) throw websiteError;
+  return website.id;
+}
+
+export async function listWebsites(supabase: Db, tenantId: string) {
+  const { data, error } = await supabase
+    .from("websites")
+    .select(
+      "id, merchant_id, slug, state, theme, domain, seo_title, published_version, published_at, last_generated_at, created_at, updated_at, merchant:merchants(name, slug, vertical), website_pages(id)",
+    )
+    .eq("tenant_id", tenantId)
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((website) => ({
+    ...website,
+    pagesCount: Array.isArray(website.website_pages) ? website.website_pages.length : 0,
+  }));
+}
+
+export async function getWebsiteWithPages(supabase: Db, tenantId: string, websiteId: string) {
+  const { data: website, error } = await supabase
+    .from("websites")
+    .select(
+      "*, merchant:merchants(id, name, slug, vertical, tagline, description), website_pages(id, path, title, kind, state, version, seo_title, meta_description, updated_at, created_at)",
+    )
+    .eq("tenant_id", tenantId)
+    .eq("id", websiteId)
+    .maybeSingle();
+  if (error) throw error;
+  return website ?? null;
+}
+
+export async function generateHomePageFromGraph(
+  supabase: Db,
+  tenantId: string,
+  websiteId: string,
+  actorId: string,
+) {
+  const { data: website, error: websiteError } = await supabase
+    .from("websites")
+    .select("id, merchant_id")
+    .eq("tenant_id", tenantId)
+    .eq("id", websiteId)
+    .single();
+  if (websiteError) throw websiteError;
+  if (!website) throw new Error("Website not found");
+
+  const graph = await loadMerchantGraph(supabase, tenantId, website.merchant_id);
+  const { merchant } = graph;
+
+  const primary = graph.locations.find((location) => location.is_primary) ?? graph.locations[0];
+  const city = primary?.city ?? null;
+  const locationLine = primary ? [primary.city, primary.region].filter(Boolean).join(", ") : null;
+
+  const blocks = [
+    {
+      type: "hero",
+      name: merchant.name,
+      tagline: merchant.tagline,
+      description: merchant.description,
+      vertical: merchant.vertical,
+      logoUrl: merchant.logo_url,
+    },
+    {
+      type: "locations",
+      city: city,
+      locationLine: locationLine,
+      items: graph.locations.map((location) => ({
+        label: location.label,
+        addressLine1: location.address_line1,
+        addressLine2: location.address_line2,
+        city: location.city,
+        region: location.region,
+        postalCode: location.postal_code,
+        country: location.country,
+        phone: location.phone,
+        isPrimary: location.is_primary,
+        hours: location.business_hours.map((hours) => ({
+          dayOfWeek: hours.day_of_week,
+          opensAt: hours.opens_at,
+          closesAt: hours.closes_at,
+          isClosed: hours.is_closed,
+        })),
+      })),
+    },
+    {
+      type: "services",
+      items: graph.services.map((service) => ({
+        name: service.name,
+        description: service.description,
+        priceCents: service.price_cents,
+        durationMinutes: service.duration_minutes,
+      })),
+    },
+    {
+      type: "products",
+      items: graph.products.map((product) => ({
+        name: product.name,
+        description: product.description,
+        priceCents: product.price_cents,
+        currency: product.currency,
+        sku: product.sku,
+      })),
+    },
+    {
+      type: "offers",
+      items: graph.offers.map((offer) => ({
+        title: offer.title,
+        description: offer.description,
+        discountLabel: offer.discount_label,
+        endsAt: offer.ends_at,
+      })),
+    },
+  ];
+
+  const seoTitle = merchant.name + (city ? ` in ${city}` : "");
+  const metaDescription =
+    merchant.tagline ??
+    merchant.description?.slice(0, 155) ??
+    `${merchant.name} — a local ${merchant.vertical} business.`;
+
+  const { data: existing, error: existingError } = await supabase
+    .from("website_pages")
+    .select("id, version")
+    .eq("tenant_id", tenantId)
+    .eq("website_id", websiteId)
+    .eq("path", "/")
+    .maybeSingle();
+  if (existingError) throw existingError;
+
+  const now = new Date().toISOString();
+  const version = (existing?.version ?? 0) + 1;
+
+  const pageFields: Database["public"]["Tables"]["website_pages"]["Insert"] = {
+    tenant_id: tenantId,
+    website_id: websiteId,
+    merchant_id: website.merchant_id,
+    path: "/",
+    kind: "home",
+    title: merchant.name,
+    seo_title: seoTitle,
+    meta_description: metaDescription,
+    body: buildHomeBody(graph),
+    blocks: blocks as never,
+    state: "draft",
+    generated: true,
+    locked: true,
+    sort_order: 0,
+    version,
+    updated_at: now,
+  };
+
+  const { data: page, error: pageError } = existing
+    ? await supabase
+        .from("website_pages")
+        .update(pageFields)
+        .eq("tenant_id", tenantId)
+        .eq("id", existing.id)
+        .select("id, path, title, state, version, updated_at")
+        .single()
+    : await supabase
+        .from("website_pages")
+        .insert(pageFields)
+        .select("id, path, title, state, version, updated_at")
+        .single();
+  if (pageError) throw pageError;
+
+  const { error: updateError } = await supabase
+    .from("websites")
+    .update({
+      state: "draft",
+      last_generated_at: now,
+      seo_title: seoTitle,
+      published_at: null,
+      updated_at: now,
+    })
+    .eq("tenant_id", tenantId)
+    .eq("id", websiteId);
+  if (updateError) throw updateError;
+
+  return {
+    websiteId,
+    merchantId: website.merchant_id,
+    page,
+    version,
+    sectionCount: blocks.length,
+  };
+}
+
+function buildHomeBody(graph: MerchantGraph): string {
+  const { merchant } = graph;
+  const lines: string[] = [];
+  lines.push(`# ${merchant.name}`);
+  if (merchant.tagline) lines.push(merchant.tagline);
+  if (merchant.description) lines.push("", merchant.description);
+
+  if (graph.locations.length > 0) {
+    lines.push("", "## Locations");
+    for (const location of graph.locations) {
+      const parts = [location.label, [location.city, location.region].filter(Boolean).join(", ")]
+        .filter(Boolean)
+        .join(" — ");
+      const hours = location.business_hours
+        .filter((entry) => !entry.is_closed)
+        .map((entry) => `${entry.day_of_week}: ${entry.opens_at ?? "—"}-${entry.closes_at ?? "—"}`)
+        .join(", ");
+      lines.push(`- ${parts}${hours ? ` (${hours})` : ""}`);
+    }
+  }
+
+  if (graph.services.length > 0) {
+    lines.push("", "## Services");
+    for (const service of graph.services) {
+      const price = service.price_cents != null ? `$${(service.price_cents / 100).toFixed(2)}` : "";
+      const duration = service.duration_minutes ? ` · ${service.duration_minutes} min` : "";
+      lines.push(`- ${service.name}${price ? ` — ${price}` : ""}${duration}`);
+    }
+  }
+
+  if (graph.products.length > 0) {
+    lines.push("", "## Products");
+    for (const product of graph.products) {
+      const price = product.price_cents != null ? `$${(product.price_cents / 100).toFixed(2)}` : "";
+      lines.push(`- ${product.name}${price ? ` — ${price}` : ""}`);
+    }
+  }
+
+  if (graph.offers.length > 0) {
+    lines.push("", "## Offers");
+    for (const offer of graph.offers) {
+      const ends = offer.ends_at
+        ? ` valid until ${new Date(offer.ends_at).toISOString().slice(0, 10)}`
+        : "";
+      lines.push(
+        `- ${offer.title}${offer.discount_label ? ` — ${offer.discount_label}` : ""}${ends}`,
+      );
+    }
+  }
+
+  return lines.join("\n");
+}
+
+export async function publishPage(supabase: Db, tenantId: string, websiteId: string) {
+  const now = new Date().toISOString();
+  const { data: website, error: websiteError } = await supabase
+    .from("websites")
+    .select("id, merchant_id")
+    .eq("tenant_id", tenantId)
+    .eq("id", websiteId)
+    .maybeSingle();
+  if (websiteError) throw websiteError;
+  if (!website) throw new Error("Website not found");
+
+  const { data: home, error: homeError } = await supabase
+    .from("website_pages")
+    .select("id, path, version")
+    .eq("tenant_id", tenantId)
+    .eq("website_id", websiteId)
+    .eq("path", "/")
+    .maybeSingle();
+  if (homeError) throw homeError;
+  if (!home) throw new Error("Generate a homepage before publishing.");
+
+  const { error: websiteUpdateError } = await supabase
+    .from("websites")
+    .update({
+      state: "published",
+      published_at: now,
+      published_version: home.version,
+      updated_at: now,
+    })
+    .eq("tenant_id", tenantId)
+    .eq("id", websiteId);
+  if (websiteUpdateError) throw websiteUpdateError;
+
+  const { error: pageError } = await supabase
+    .from("website_pages")
+    .update({ state: "published", published_at: now, updated_at: now })
+    .eq("tenant_id", tenantId)
+    .eq("id", home.id);
+  if (pageError) throw pageError;
+
+  return { websiteId, merchantId: website.merchant_id, publishedVersion: home.version };
+}
+
+export async function unpublishPage(supabase: Db, tenantId: string, websiteId: string) {
+  const now = new Date().toISOString();
+  const { error: websiteError } = await supabase
+    .from("websites")
+    .update({ state: "draft", published_at: null, updated_at: now })
+    .eq("tenant_id", tenantId)
+    .eq("id", websiteId);
+  if (websiteError) throw websiteError;
+
+  const { data: home, error: fetchError } = await supabase
+    .from("website_pages")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("website_id", websiteId)
+    .eq("path", "/")
+    .maybeSingle();
+  if (fetchError) throw fetchError;
+
+  if (home) {
+    const { error: pageError } = await supabase
+      .from("website_pages")
+      .update({ state: "draft", published_at: null, updated_at: now })
+      .eq("tenant_id", tenantId)
+      .eq("id", home.id);
+    if (pageError) throw pageError;
+  }
+
+  return { websiteId };
+}
+
+export async function getPublishedPublicPage(supabase: Db, slug: string) {
+  const { data: merchant, error: merchantError } = await supabase
+    .from("merchants")
+    .select("id, name, slug, tagline, description, vertical, logo_url")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (merchantError) throw merchantError;
+  if (!merchant) return null;
+
+  const { data: website, error: websiteError } = await supabase
+    .from("websites")
+    .select("id, slug, state, theme, published_version, published_at, updated_at, seo_title")
+    .eq("merchant_id", merchant.id)
+    .eq("state", "published")
+    .maybeSingle();
+  if (websiteError) throw websiteError;
+  if (!website) return null;
+
+  const { data: pages, error: pagesError } = await supabase
+    .from("website_pages")
+    .select("id, path, title, state, version, seo_title, meta_description")
+    .eq("website_id", website.id)
+    .eq("state", "published");
+  if (pagesError) throw pagesError;
+
+  const page = (pages ?? []).find((candidate) => candidate.path === "/");
+  if (!page) return null;
+
+  const [locations, products, services, offers] = await Promise.all([
+    supabase
+      .from("locations")
+      .select(
+        "id, label, address_line1, address_line2, city, region, postal_code, country, phone, is_primary, business_hours(id, day_of_week, opens_at, closes_at, is_closed)",
+      )
+      .eq("merchant_id", merchant.id)
+      .order("is_primary", { ascending: false }),
+    supabase
+      .from("products")
+      .select("id, name, description, price_cents, currency, sku")
+      .eq("merchant_id", merchant.id)
+      .eq("state", "published")
+      .order("name"),
+    supabase
+      .from("services")
+      .select("id, name, description, price_cents, duration_minutes")
+      .eq("merchant_id", merchant.id)
+      .eq("state", "published")
+      .order("name"),
+    supabase
+      .from("offers")
+      .select("id, title, description, discount_label, ends_at")
+      .eq("merchant_id", merchant.id)
+      .eq("state", "published")
+      .order("created_at", { ascending: false }),
+  ]);
+
+  return {
+    website: {
+      id: website.id,
+      slug: website.slug,
+      state: website.state,
+      theme: website.theme,
+      publishedVersion: website.published_version,
+      publishedAt: website.published_at,
+      updatedAt: website.updated_at,
+      seoTitle: website.seo_title,
+    },
+    merchant,
+    page: {
+      id: page.id,
+      path: page.path,
+      title: page.title,
+      state: page.state,
+      version: page.version,
+      seoTitle: page.seo_title,
+      metaDescription: page.meta_description,
+    },
+    locations: locations.data ?? [],
+    products: products.data ?? [],
+    services: services.data ?? [],
+    offers: offers.data ?? [],
+  };
+}

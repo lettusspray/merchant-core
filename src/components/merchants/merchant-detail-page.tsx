@@ -4,8 +4,10 @@ import {
   ArrowLeft,
   CalendarDays,
   CheckCircle2,
+  ExternalLink,
   FileText,
   Globe,
+  Loader2,
   MapPin,
   Package,
   Radio,
@@ -15,6 +17,7 @@ import {
   TableProperties,
   Tag,
   TriangleAlert,
+  Wand2,
 } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
@@ -37,7 +40,11 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSessionState } from "@/hooks/use-session-state";
-import { merchantDetailFn } from "@/lib/api/console.functions";
+import {
+  ensureWebsiteForMerchantFn,
+  generateHomePageFn,
+  merchantDetailFn,
+} from "@/lib/api/console.functions";
 
 type Detail = Awaited<ReturnType<typeof merchantDetailFn>>;
 
@@ -220,7 +227,107 @@ function OverviewTab({ detail, onSaved }: { detail: Detail; onSaved: () => void 
           </dl>
         </CardContent>
       </Card>
+
+      <WebsiteCard detail={detail} onSaved={onSaved} />
     </div>
+  );
+}
+
+function WebsiteCard({ detail, onSaved }: { detail: Detail; onSaved: () => void | Promise<void> }) {
+  const website = (detail.websites ?? [])[0];
+  const publicSlug = website?.slug ?? detail.merchant.slug ?? null;
+  const [busy, setBusy] = useState<"ensure" | "generate" | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const generate = async () => {
+    if (busy) return;
+    setBusy("ensure");
+    setNotice(null);
+    try {
+      const { website: ensured } = await ensureWebsiteForMerchantFn({
+        data: { merchantId: detail.merchant.id },
+      });
+      if (!ensured) throw new Error("Website could not be created.");
+      setBusy("generate");
+      await generateHomePageFn({ data: { websiteId: ensured.id } });
+      setNotice("Homepage generated as a draft and recorded in the event log. Publish to go live.");
+      await onSaved();
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : "Homepage generation failed.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const generateLabel =
+    busy === "ensure" ? "Ensuring…" : busy === "generate" ? "Generating…" : "Generate home";
+
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between gap-3 pb-2">
+        <div className="space-y-1">
+          <CardTitle className="text-base">Website</CardTitle>
+          {notice ? <p className="text-xs font-medium text-muted-foreground">{notice}</p> : null}
+        </div>
+        {website ? (
+          <Badge variant={website.state === "published" ? "default" : "secondary"}>
+            {website.state}
+          </Badge>
+        ) : null}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {website ? (
+          <>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+              <span>
+                {website.website_pages?.length ?? 0} page
+                {(website.website_pages?.length ?? 0) === 1 ? "" : "s"}
+              </span>
+              <span>· version {website.published_version}</span>
+              {website.last_generated_at ? (
+                <span>· generated {formatDate(website.last_generated_at)}</span>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="outline" asChild>
+                <Link to="/websites/$id" params={{ id: website.id }}>
+                  <ExternalLink className="size-4" />
+                  Open in Websites
+                </Link>
+              </Button>
+              {website.state === "published" && publicSlug ? (
+                <Button size="sm" variant="outline" asChild>
+                  <Link to="/p/$merchantSlug" params={{ merchantSlug: publicSlug }} target="_blank">
+                    <ExternalLink className="size-4" />
+                    View public page
+                  </Link>
+                </Button>
+              ) : null}
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy !== null}
+                onClick={() => void generate()}
+              >
+                {busy ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
+                {generateLabel}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground">
+              No website yet. Generate a draft home page from the current merchant graph, then
+              publish it live.
+            </p>
+            <Button size="sm" disabled={busy !== null} onClick={() => void generate()}>
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <Wand2 className="size-4" />}
+              {generateLabel}
+            </Button>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -654,32 +761,58 @@ function WebsitesTab({ detail }: { detail: Detail }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Domain</TableHead>
+                <TableHead>Website</TableHead>
+                <TableHead>Public page</TableHead>
                 <TableHead>State</TableHead>
                 <TableHead className="text-right">Pages</TableHead>
+                <TableHead className="text-right">Version</TableHead>
+                <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {websites.map((website) => (
-                <TableRow key={website.id}>
-                  <TableCell>
-                    <a
-                      href={`https://${website.domain}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-medium text-primary hover:underline"
-                    >
-                      {website.domain}
-                    </a>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{website.state}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {Array.isArray(website.website_pages) ? website.website_pages.length : 0}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {websites.map((website) => {
+                const publicSlug = website.slug ?? detail.merchant.slug ?? null;
+                return (
+                  <TableRow key={website.id}>
+                    <TableCell className="font-medium">
+                      {publicSlug ? `/p/${publicSlug}` : "Unlinked"}
+                    </TableCell>
+                    <TableCell>
+                      {website.state === "published" && publicSlug ? (
+                        <Link
+                          to="/p/$merchantSlug"
+                          params={{ merchantSlug: publicSlug }}
+                          target="_blank"
+                          className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+                        >
+                          View public page
+                          <ExternalLink className="size-3" />
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Not live</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={website.state === "published" ? "default" : "secondary"}>
+                        {website.state}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {Array.isArray(website.website_pages) ? website.website_pages.length : 0}
+                    </TableCell>
+                    <TableCell className="text-right">{website.published_version}</TableCell>
+                    <TableCell className="text-right">
+                      <Link
+                        to="/websites/$id"
+                        params={{ id: website.id }}
+                        className="text-xs text-primary hover:underline"
+                      >
+                        Manage
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}

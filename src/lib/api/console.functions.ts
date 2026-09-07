@@ -7,7 +7,11 @@ import {
   createMerchant,
   dashboardSnapshot,
   discoveryCandidates,
+  ensureWebsiteForMerchant,
+  generateHomePageFromGraph,
+  getWebsiteWithPages,
   happeningsList,
+  listWebsites,
   listWorkspaces,
   MERCHANT_STATUSES,
   MERCHANT_VERTICALS,
@@ -16,12 +20,14 @@ import {
   ordersList,
   promoteCandidate,
   PUBLISH_STATES,
+  publishPage,
   recordEvent,
   resolveTenant,
   runDiscovery,
   runMockVisibility,
   systemActivity,
   tenantCategories,
+  unpublishPage,
   updateHappeningStatus,
   updateMerchantIdentity,
   upsertCatalogItem,
@@ -472,5 +478,107 @@ export const runDiscoveryFn = createServerFn({ method: "POST" })
     if (result.status === "failed") {
       throw new Error(result.error ?? "Discovery run failed.");
     }
+    return { result };
+  });
+
+// =============== WEBSITE FACTORY ===============
+
+export const websitesListFn = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    const websites = await listWebsites(supabase, tenantId);
+    return { websites };
+  });
+
+export const websiteDetailFn = createServerFn({ method: "GET" })
+  .validator((input: { websiteId: string }) => input)
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    const website = await getWebsiteWithPages(supabase, tenantId, data.websiteId);
+    if (!website) throw new Error("Website not found");
+    return { website };
+  });
+
+const websiteSchema = z.object({ websiteId: z.string().uuid() });
+const merchantIdSchema = z.object({ merchantId: z.string().uuid() });
+
+export const ensureWebsiteForMerchantFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => merchantIdSchema.parse(input))
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    const websiteId = await ensureWebsiteForMerchant(supabase, tenantId, data.merchantId);
+    const website = await getWebsiteWithPages(supabase, tenantId, websiteId);
+    return { website };
+  });
+
+export const generateHomePageFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => websiteSchema.parse(input))
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    const result = await generateHomePageFromGraph(
+      supabase,
+      tenantId,
+      data.websiteId,
+      context.userId,
+    );
+    await recordEvent(supabase, {
+      tenantId,
+      actorId: context.userId,
+      kind: "website.generated",
+      subjectType: "website_page",
+      subjectId: result.page.id,
+      payload: {
+        websiteId: result.websiteId,
+        merchantId: result.merchantId,
+        path: "/",
+        version: result.version,
+        sections: result.sectionCount,
+        state: "draft",
+      },
+    });
+    return { result };
+  });
+
+export const publishPageFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => websiteSchema.parse(input))
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    const result = await publishPage(supabase, tenantId, data.websiteId);
+    await recordEvent(supabase, {
+      tenantId,
+      actorId: context.userId,
+      kind: "website.published",
+      subjectType: "website",
+      subjectId: data.websiteId,
+      payload: { merchantId: result.merchantId, publishedVersion: result.publishedVersion },
+    });
+    return { result };
+  });
+
+export const unpublishPageFn = createServerFn({ method: "POST" })
+  .validator((input: unknown) => websiteSchema.parse(input))
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context, data }) => {
+    const supabase = context.supabase;
+    const tenantId = await resolveTenant(supabase);
+    const result = await unpublishPage(supabase, tenantId, data.websiteId);
+    await recordEvent(supabase, {
+      tenantId,
+      actorId: context.userId,
+      kind: "website.unpublished",
+      subjectType: "website",
+      subjectId: data.websiteId,
+      payload: {},
+    });
     return { result };
   });

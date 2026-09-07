@@ -18,7 +18,10 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SigninRouteImport } from './routes/signin'
 import { Route as SystemRouteImport } from './routes/system'
 import { Route as VisibilityRouteImport } from './routes/visibility'
+import { Route as WebsitesRouteImport } from './routes/websites'
 import { Route as MerchantsIdRouteImport } from './routes/merchants.$id'
+import { Route as PMerchantSlugRouteImport } from './routes/p.$merchantSlug'
+import { Route as WebsitesIdRouteImport } from './routes/websites.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -65,10 +68,25 @@ const VisibilityRoute = VisibilityRouteImport.update({
   path: '/visibility',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WebsitesRoute = WebsitesRouteImport.update({
+  id: '/websites',
+  path: '/websites',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MerchantsIdRoute = MerchantsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
   getParentRoute: () => MerchantsRoute,
+} as any)
+const PMerchantSlugRoute = PMerchantSlugRouteImport.update({
+  id: '/p/$merchantSlug',
+  path: '/p/$merchantSlug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WebsitesIdRoute = WebsitesIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => WebsitesRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -81,7 +99,10 @@ export interface FileRoutesByFullPath {
   '/signin': typeof SigninRoute
   '/system': typeof SystemRoute
   '/visibility': typeof VisibilityRoute
+  '/websites': typeof WebsitesRouteWithChildren
   '/merchants/$id': typeof MerchantsIdRoute
+  '/p/$merchantSlug': typeof PMerchantSlugRoute
+  '/websites/$id': typeof WebsitesIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -93,7 +114,10 @@ export interface FileRoutesByTo {
   '/signin': typeof SigninRoute
   '/system': typeof SystemRoute
   '/visibility': typeof VisibilityRoute
+  '/websites': typeof WebsitesRouteWithChildren
   '/merchants/$id': typeof MerchantsIdRoute
+  '/p/$merchantSlug': typeof PMerchantSlugRoute
+  '/websites/$id': typeof WebsitesIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -106,7 +130,10 @@ export interface FileRoutesById {
   '/signin': typeof SigninRoute
   '/system': typeof SystemRoute
   '/visibility': typeof VisibilityRoute
+  '/websites': typeof WebsitesRouteWithChildren
   '/merchants/$id': typeof MerchantsIdRoute
+  '/p/$merchantSlug': typeof PMerchantSlugRoute
+  '/websites/$id': typeof WebsitesIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -120,7 +147,10 @@ export interface FileRouteTypes {
     | '/signin'
     | '/system'
     | '/visibility'
+    | '/websites'
     | '/merchants/$id'
+    | '/p/$merchantSlug'
+    | '/websites/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -132,7 +162,10 @@ export interface FileRouteTypes {
     | '/signin'
     | '/system'
     | '/visibility'
+    | '/websites'
     | '/merchants/$id'
+    | '/p/$merchantSlug'
+    | '/websites/$id'
   id:
     | '__root__'
     | '/'
@@ -144,7 +177,10 @@ export interface FileRouteTypes {
     | '/signin'
     | '/system'
     | '/visibility'
+    | '/websites'
     | '/merchants/$id'
+    | '/p/$merchantSlug'
+    | '/websites/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -157,6 +193,8 @@ export interface RootRouteChildren {
   SigninRoute: typeof SigninRoute
   SystemRoute: typeof SystemRoute
   VisibilityRoute: typeof VisibilityRoute
+  WebsitesRoute: typeof WebsitesRouteWithChildren
+  PMerchantSlugRoute: typeof PMerchantSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -224,12 +262,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VisibilityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/websites': {
+      id: '/websites'
+      path: '/websites'
+      fullPath: '/websites'
+      preLoaderRoute: typeof WebsitesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/merchants/$id': {
       id: '/merchants/$id'
       path: '/$id'
       fullPath: '/merchants/$id'
       preLoaderRoute: typeof MerchantsIdRouteImport
       parentRoute: typeof MerchantsRoute
+    }
+    '/p/$merchantSlug': {
+      id: '/p/$merchantSlug'
+      path: '/p/$merchantSlug'
+      fullPath: '/p/$merchantSlug'
+      preLoaderRoute: typeof PMerchantSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/websites/$id': {
+      id: '/websites/$id'
+      path: '/$id'
+      fullPath: '/websites/$id'
+      preLoaderRoute: typeof WebsitesIdRouteImport
+      parentRoute: typeof WebsitesRoute
     }
   }
 }
@@ -246,6 +305,18 @@ const MerchantsRouteWithChildren = MerchantsRoute._addFileChildren(
   MerchantsRouteChildren,
 )
 
+interface WebsitesRouteChildren {
+  WebsitesIdRoute: typeof WebsitesIdRoute
+}
+
+const WebsitesRouteChildren: WebsitesRouteChildren = {
+  WebsitesIdRoute: WebsitesIdRoute,
+}
+
+const WebsitesRouteWithChildren = WebsitesRoute._addFileChildren(
+  WebsitesRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CommerceRoute: CommerceRoute,
@@ -256,17 +327,9 @@ const rootRouteChildren: RootRouteChildren = {
   SigninRoute: SigninRoute,
   SystemRoute: SystemRoute,
   VisibilityRoute: VisibilityRoute,
+  WebsitesRoute: WebsitesRouteWithChildren,
+  PMerchantSlugRoute: PMerchantSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

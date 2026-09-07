@@ -3,6 +3,7 @@ import {
   Activity,
   Compass,
   Eye,
+  Globe,
   LayoutDashboard,
   LogOut,
   Settings,
@@ -44,6 +45,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/merchants", label: "Merchants", icon: Store },
+  { href: "/websites", label: "Websites", icon: Globe },
   { href: "/discovery", label: "Discovery", icon: Compass },
   { href: "/happenings", label: "Happenings", icon: Webhook },
   { href: "/visibility", label: "AI Visibility", icon: Eye },
