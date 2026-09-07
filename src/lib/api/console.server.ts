@@ -324,7 +324,14 @@ export async function merchantDetail(supabase: Db, tenantId: string, merchantId:
       .eq("id", merchantId)
       .maybeSingle(),
     supabase.from("locations").select("*").match(eq).order("is_primary", { ascending: false }),
-    supabase.from("business_hours").select("*").match(eq).order("day_of_week"),
+    supabase
+      .from("business_hours")
+      .select(
+        "id, tenant_id, location_id, day_of_week, opens_at, closes_at, is_closed, locations!inner(merchant_id)",
+      )
+      .eq("tenant_id", tenantId)
+      .eq("locations.merchant_id", merchantId)
+      .order("day_of_week"),
     supabase.from("contacts").select("*").match(eq),
     supabase.from("products").select("*").match(eq).order("name"),
     supabase.from("services").select("*").match(eq).order("name"),

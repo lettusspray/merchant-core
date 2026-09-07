@@ -213,4 +213,44 @@ There is no separate seed script — demo rows live in the migrations and load w
 - Sign-up: the `on_auth_user_created` trigger auto-joins every new user to the demo tenant as **owner** — create any account via the Sign in → *Create account* flow and you instantly see all demo data.
 - Discovery: `discovery_candidates` and `happenings` + `happening_reviews` rows are seeded so the queue and review pages have data on first load.
 - Sample AI-visibility: `visibility_queries` and `visibility_snapshots` are seeded; the **Visibility** page can also run the local readiness estimator (no MercerCroft credentials required — results are labelled as local, never as live AI answers).
+
+## Tenant isolation (merchant portal)
+
+`supabase/migrations/20260907120000_merchant_portal_tenant_isolation.sql` hardens every
+owner-accessible policy in the merchant portal. Owner authorization now proves **two**
+facts: the caller owns the merchant **and** the row's `tenant_id` equals that merchant's
+real tenant. Tenant identity is always derived from the `merchants` row via
+`SECURITY DEFINER` helpers (`merchant_tenant`, `is_merchant_owner`,
+`is_owner_merchant_in_tenant`, `is_owner_location_in_tenant`,
+`is_owner_website_in_tenant`, `is_owner_of_tenant`) — a caller-supplied `tenant_id` is
+never trusted for authorization. `merchant_owners` bindings (tenant/merchant/email) are
+immutable via trigger; the email self-claim may only set `user_id`. Business hours
+authorize through their `location`; `website_pages` authorize through their parent
+`website` + `merchant` + `tenant`; `events` remain append-only with the event tenant
+anchored to an owned merchant. Server-side, `merchantDetail` now loads business hours via
+`locations!inner(merchant_id)` instead of a nonexistent `location_id` predicate.
+
+RLS policies were verified by reasoned audit (the Supabase CLI is not available in this
+environment). Note that `supabase db push` on empty demo tables would report all policies
+gracefully with zero rows — that scan is benign and not evidence of correctness. The
+case-by-case reasoning (all `TO authenticated`, owner = authenticated user with a
+`merchant_owners` row whose `tenant_id` matches the linked merchant, member = any
+`tenant_members` row) is:
+
+1. Owner reads their own merchant M — `owner read merchants` passes `is_merchant_owner(id)`.
+2. Owner edits non-tenant fields of M — `owner update merchants` passes `USING` and new row keeps tenant.
+3. Owner tries to edit another operator's merchant with no owner link — no `merchant_owners` row → `is_merchant_owner` false → denied.
+4. Owner tries to set M's `tenant_id` to any other tenant — new-row `WITH CHECK is_owner_merchant_in_tenant(id, tenant_id)` compares against M's real tenant → false → denied; they cannot retarget M.
+5. Locations: owner inserts a location with matching `tenant_id`/owned `merchant_id` — `WITH CHECK is_owner_merchant_in_tenant` true → allowed.
+6. Locations: owner inserts/updates a location whose `tenant_id` differs from the owned merchant's real tenant — `merchant_tenant(merchant_id) = tenant_id` fails (the `tenants` check is the merchant's actual tenant) → denied.
+7. Locations: owner deletes another owner's location, or moves a location's `tenant_id` to a third tenant — `USING`/`WITH CHECK` on the OLD and NEW rows prove ownership + tenant consistency → denied.
+8. Products/services/offers/happenings — same owner-merchant-in-tenant predicate for `USING` + `WITH CHECK` on insert/update/delete → only tenant-consistent rows of owned merchants.
+9. Business hours — `is_owner_location_in_tenant` joins the location to the owned merchant and requires `location.tenant_id = hour.tenant_id`; a forged `location_id` or `tenant_id` fails → insert/update/delete denied.
+10. Websites — owner read/insert/update require `is_owner_merchant_in_tenant(merchant_id, tenant_id)`; a website pointing at an unowned merchant or another tenant is invisible and unmodifiable.
+11. Website pages — read/insert/update also require `is_owner_website_in_tenant(website_id, tenant_id, merchant_id)`: the page's `website_id` must belong to the same owned merchant in the same tenant, so a page can't be attached to another merchant's website.
+12. Events — owner `INSERT` only; `WITH CHECK is_owner_of_tenant(tenant_id)` means the event tenant must be the tenant of a merchant the caller owns → crafted events cannot target an unrelated tenant.
+13. Events (member/operator) — the existing member event-insert policy is untouched, so operators keep their flow.
+14. Operator invites — `member insert merchant_owners` requires `is_tenant_member(tenant_id) AND merchant_tenant(merchant_id) = tenant_id`, so operators can invite emails only for merchants that actually belong to their tenant; the immutability trigger blocks retargeting an existing invite.
+15. Email self-claim — the broad member `UPDATE` policy is dropped, so the only way to change a `merchant_owners` row is via `owner claim merchant_owners`: allowed only when `lower(email)` equals the signed-in JWT email and the row is pending (or already bound to that user); `WITH CHECK` pins `user_id = auth.uid()` with the email unchanged, and the trigger keeps tenant/merchant/email fixed → the claim can't be forged onto another row, another email's invite, or another merchant.
+16. Non-owner authenticated user — no `merchant_owners` row for any merchant they don't own → every owner predicate is false and every owner policy returns no rows → the graph tables are closed to them.
 - Empty environments: re-run migrations (or apply them to a fresh branch) to reload the demo workspace.
