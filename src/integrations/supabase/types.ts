@@ -1929,14 +1929,12 @@ export type Database = {
           created_by: string | null
           generated: boolean
           id: string
-          locked: boolean
           meta_description: string | null
           page_id: string
           seo_title: string | null
           tenant_id: string
           title: string
           version: number
-          website_id: string
         }
         Insert: {
           blocks?: Json
@@ -1945,14 +1943,12 @@ export type Database = {
           created_by?: string | null
           generated?: boolean
           id?: string
-          locked?: boolean
           meta_description?: string | null
           page_id: string
           seo_title?: string | null
           tenant_id: string
           title: string
           version: number
-          website_id: string
         }
         Update: {
           blocks?: Json
@@ -1961,14 +1957,12 @@ export type Database = {
           created_by?: string | null
           generated?: boolean
           id?: string
-          locked?: boolean
           meta_description?: string | null
           page_id?: string
           seo_title?: string | null
           tenant_id?: string
           title?: string
           version?: number
-          website_id?: string
         }
         Relationships: [
           {
@@ -1983,13 +1977,6 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "website_page_versions_website_id_fkey"
-            columns: ["website_id"]
-            isOneToOne: false
-            referencedRelation: "websites"
             referencedColumns: ["id"]
           },
         ]
