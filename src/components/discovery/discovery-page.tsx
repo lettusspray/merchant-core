@@ -722,7 +722,7 @@ function CandidateDetailCard({
 
   const merchantLink = candidate.merchant_id ? (
     <Link
-      to="/merchants/$id"
+      to="/admin/merchants/$id"
       params={{ id: candidate.merchant_id }}
       className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
     >

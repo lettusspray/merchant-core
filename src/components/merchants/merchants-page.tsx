@@ -247,7 +247,7 @@ export function MerchantsPage() {
       setCreateRegion("");
       await load();
       void navigate({
-        to: "/merchants/$id",
+        to: "/admin/merchants/$id",
         params: { id: result.merchant.id },
       });
     } catch (err) {
@@ -381,12 +381,12 @@ export function MerchantsPage() {
                         key={merchant.id}
                         className="cursor-pointer"
                         onClick={() =>
-                          void navigate({ to: "/merchants/$id", params: { id: merchant.id } })
+                          void navigate({ to: "/admin/merchants/$id", params: { id: merchant.id } })
                         }
                       >
                         <TableCell>
                           <Link
-                            to="/merchants/$id"
+                            to="/admin/merchants/$id"
                             params={{ id: merchant.id }}
                             onClick={(event) => event.stopPropagation()}
                             className="flex flex-col font-medium hover:text-primary"

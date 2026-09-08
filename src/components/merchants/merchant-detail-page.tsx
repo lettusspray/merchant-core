@@ -453,7 +453,7 @@ function WebsiteCard({ detail, onSaved }: { detail: Detail; onSaved: () => void 
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button size="sm" variant="outline" asChild>
-                <Link to="/websites/$id" params={{ id: website.id }}>
+                <Link to="/admin/websites/$id" params={{ id: website.id }}>
                   <ExternalLink className="size-4" />
                   Open in Websites
                 </Link>
@@ -1042,7 +1042,7 @@ function WebsitesTab({ detail }: { detail: Detail }) {
                     <TableCell className="text-right">{website.published_version}</TableCell>
                     <TableCell className="text-right">
                       <Link
-                        to="/websites/$id"
+                        to="/admin/websites/$id"
                         params={{ id: website.id }}
                         className="text-xs text-primary hover:underline"
                       >
@@ -1299,7 +1299,7 @@ function NotFoundView() {
       </CardHeader>
       <CardContent>
         <Button asChild size="sm" variant="outline">
-          <Link to="/merchants">Back to merchants</Link>
+          <Link to="/admin/merchants">Back to merchants</Link>
         </Button>
       </CardContent>
     </Card>
@@ -1446,7 +1446,7 @@ export function MerchantDetailPage({ merchantId }: { merchantId: string }) {
     <AppShell title={title}>
       <div className="space-y-6">
         <Link
-          to="/merchants"
+          to="/admin/merchants"
           className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="size-4" />

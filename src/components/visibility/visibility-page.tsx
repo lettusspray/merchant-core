@@ -157,7 +157,7 @@ function RunRow({
                   <p className="text-xs font-medium text-muted-foreground">Merchant</p>
                   {merchant ? (
                     <Link
-                      to="/merchants/$id"
+                      to="/admin/merchants/$id"
                       params={{ id: run.merchant_id }}
                       onClick={(event) => event.stopPropagation()}
                       className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline"

@@ -223,7 +223,7 @@ function WebsitePanel({ merchant }: { merchant: PortalMerchant }) {
           {website && data.operator ? (
             <Button size="sm" variant="ghost" asChild>
               <Link
-                to="/websites/$id"
+                to="/admin/websites/$id"
                 params={{ id: website.id }}
                 className="text-muted-foreground"
               >
