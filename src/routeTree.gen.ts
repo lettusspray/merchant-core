@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as PortalRouteImport } from './routes/portal'
 import { Route as SigninRouteImport } from './routes/signin'
@@ -32,6 +33,11 @@ import { Route as PortalServicesRouteImport } from './routes/portal.services'
 import { Route as AdminMerchantsIdRouteImport } from './routes/admin.merchants.$id'
 import { Route as AdminWebsitesIdRouteImport } from './routes/admin.websites.$id'
 
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -144,6 +150,7 @@ const AdminWebsitesIdRoute = AdminWebsitesIdRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
+  '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/portal': typeof PortalRouteWithChildren
   '/signin': typeof SigninRoute
@@ -168,6 +175,7 @@ export interface FileRoutesByFullPath {
   '/admin/websites/$id': typeof AdminWebsitesIdRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof IndexRoute
   '/signin': typeof SigninRoute
   '/admin/commerce': typeof AdminCommerceRoute
   '/admin/discovery': typeof AdminDiscoveryRoute
@@ -191,6 +199,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/portal': typeof PortalRouteWithChildren
   '/signin': typeof SigninRoute
@@ -217,6 +226,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/'
     | '/admin'
     | '/portal'
     | '/signin'
@@ -241,6 +251,7 @@ export interface FileRouteTypes {
     | '/admin/websites/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/'
     | '/signin'
     | '/admin/commerce'
     | '/admin/discovery'
@@ -263,6 +274,7 @@ export interface FileRouteTypes {
     | '/admin/websites/$id'
   id:
     | '__root__'
+    | '/'
     | '/admin'
     | '/portal'
     | '/signin'
@@ -288,6 +300,7 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   PortalRoute: typeof PortalRouteWithChildren
   SigninRoute: typeof SigninRoute
@@ -296,6 +309,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin': {
       id: '/admin'
       path: '/admin'
@@ -527,6 +547,7 @@ const PortalRouteWithChildren =
   PortalRoute._addFileChildren(PortalRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   PortalRoute: PortalRouteWithChildren,
   SigninRoute: SigninRoute,
