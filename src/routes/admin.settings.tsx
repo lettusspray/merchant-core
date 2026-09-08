@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/app-shell";
 import { SettingsPage } from "@/components/settings/settings-page";
 
-export const Route = createFileRoute("/settings")({
+export const Route = createFileRoute("/admin/settings")({
   component: Settings,
 });
 

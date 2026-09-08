@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/app-shell";
 import { VisibilityPage } from "@/components/visibility/visibility-page";
 
-export const Route = createFileRoute("/visibility")({
+export const Route = createFileRoute("/admin/visibility")({
   component: Visibility,
 });
 
