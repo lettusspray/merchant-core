@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as PortalRouteImport } from './routes/portal'
 import { Route as SigninRouteImport } from './routes/signin'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
@@ -31,6 +32,11 @@ import { Route as PortalServicesRouteImport } from './routes/portal.services'
 import { Route as AdminMerchantsIdRouteImport } from './routes/admin.merchants.$id'
 import { Route as AdminWebsitesIdRouteImport } from './routes/admin.websites.$id'
 
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PortalRoute = PortalRouteImport.update({
   id: '/portal',
   path: '/portal',
@@ -42,49 +48,49 @@ const SigninRoute = SigninRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
-  id: '/admin/',
-  path: '/admin/',
-  getParentRoute: () => rootRouteImport,
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminCommerceRoute = AdminCommerceRouteImport.update({
-  id: '/admin/commerce',
-  path: '/admin/commerce',
-  getParentRoute: () => rootRouteImport,
+  id: '/commerce',
+  path: '/commerce',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminDiscoveryRoute = AdminDiscoveryRouteImport.update({
-  id: '/admin/discovery',
-  path: '/admin/discovery',
-  getParentRoute: () => rootRouteImport,
+  id: '/discovery',
+  path: '/discovery',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminHappeningsRoute = AdminHappeningsRouteImport.update({
-  id: '/admin/happenings',
-  path: '/admin/happenings',
-  getParentRoute: () => rootRouteImport,
+  id: '/happenings',
+  path: '/happenings',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminMerchantsRoute = AdminMerchantsRouteImport.update({
-  id: '/admin/merchants',
-  path: '/admin/merchants',
-  getParentRoute: () => rootRouteImport,
+  id: '/merchants',
+  path: '/merchants',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminSettingsRoute = AdminSettingsRouteImport.update({
-  id: '/admin/settings',
-  path: '/admin/settings',
-  getParentRoute: () => rootRouteImport,
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminSystemRoute = AdminSystemRouteImport.update({
-  id: '/admin/system',
-  path: '/admin/system',
-  getParentRoute: () => rootRouteImport,
+  id: '/system',
+  path: '/system',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminVisibilityRoute = AdminVisibilityRouteImport.update({
-  id: '/admin/visibility',
-  path: '/admin/visibility',
-  getParentRoute: () => rootRouteImport,
+  id: '/visibility',
+  path: '/visibility',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminWebsitesRoute = AdminWebsitesRouteImport.update({
-  id: '/admin/websites',
-  path: '/admin/websites',
-  getParentRoute: () => rootRouteImport,
+  id: '/websites',
+  path: '/websites',
+  getParentRoute: () => AdminRoute,
 } as any)
 const PMerchantSlugRoute = PMerchantSlugRouteImport.update({
   id: '/p/$merchantSlug',
@@ -138,6 +144,7 @@ const AdminWebsitesIdRoute = AdminWebsitesIdRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
+  '/admin': typeof AdminRouteWithChildren
   '/portal': typeof PortalRouteWithChildren
   '/signin': typeof SigninRoute
   '/admin/commerce': typeof AdminCommerceRoute
@@ -184,6 +191,7 @@ export interface FileRoutesByTo {
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/admin': typeof AdminRouteWithChildren
   '/portal': typeof PortalRouteWithChildren
   '/signin': typeof SigninRoute
   '/admin/commerce': typeof AdminCommerceRoute
@@ -209,6 +217,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/admin'
     | '/portal'
     | '/signin'
     | '/admin/commerce'
@@ -254,6 +263,7 @@ export interface FileRouteTypes {
     | '/admin/websites/$id'
   id:
     | '__root__'
+    | '/admin'
     | '/portal'
     | '/signin'
     | '/admin/commerce'
@@ -278,22 +288,21 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  AdminRoute: typeof AdminRouteWithChildren
   PortalRoute: typeof PortalRouteWithChildren
   SigninRoute: typeof SigninRoute
-  AdminCommerceRoute: typeof AdminCommerceRoute
-  AdminDiscoveryRoute: typeof AdminDiscoveryRoute
-  AdminHappeningsRoute: typeof AdminHappeningsRoute
-  AdminMerchantsRoute: typeof AdminMerchantsRouteWithChildren
-  AdminSettingsRoute: typeof AdminSettingsRoute
-  AdminSystemRoute: typeof AdminSystemRoute
-  AdminVisibilityRoute: typeof AdminVisibilityRoute
-  AdminWebsitesRoute: typeof AdminWebsitesRouteWithChildren
   PMerchantSlugRoute: typeof PMerchantSlugRoute
-  AdminIndexRoute: typeof AdminIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/portal': {
       id: '/portal'
       path: '/portal'
@@ -310,66 +319,66 @@ declare module '@tanstack/react-router' {
     }
     '/admin/': {
       id: '/admin/'
-      path: '/admin'
+      path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/admin/commerce': {
       id: '/admin/commerce'
-      path: '/admin/commerce'
+      path: '/commerce'
       fullPath: '/admin/commerce'
       preLoaderRoute: typeof AdminCommerceRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/admin/discovery': {
       id: '/admin/discovery'
-      path: '/admin/discovery'
+      path: '/discovery'
       fullPath: '/admin/discovery'
       preLoaderRoute: typeof AdminDiscoveryRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/admin/happenings': {
       id: '/admin/happenings'
-      path: '/admin/happenings'
+      path: '/happenings'
       fullPath: '/admin/happenings'
       preLoaderRoute: typeof AdminHappeningsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/admin/merchants': {
       id: '/admin/merchants'
-      path: '/admin/merchants'
+      path: '/merchants'
       fullPath: '/admin/merchants'
       preLoaderRoute: typeof AdminMerchantsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/admin/settings': {
       id: '/admin/settings'
-      path: '/admin/settings'
+      path: '/settings'
       fullPath: '/admin/settings'
       preLoaderRoute: typeof AdminSettingsRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/admin/system': {
       id: '/admin/system'
-      path: '/admin/system'
+      path: '/system'
       fullPath: '/admin/system'
       preLoaderRoute: typeof AdminSystemRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/admin/visibility': {
       id: '/admin/visibility'
-      path: '/admin/visibility'
+      path: '/visibility'
       fullPath: '/admin/visibility'
       preLoaderRoute: typeof AdminVisibilityRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/admin/websites': {
       id: '/admin/websites'
-      path: '/admin/websites'
+      path: '/websites'
       fullPath: '/admin/websites'
       preLoaderRoute: typeof AdminWebsitesRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/p/$merchantSlug': {
       id: '/p/$merchantSlug'
@@ -444,29 +453,6 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface PortalRouteChildren {
-  PortalHappeningsRoute: typeof PortalHappeningsRoute
-  PortalLocationsRoute: typeof PortalLocationsRoute
-  PortalOffersRoute: typeof PortalOffersRoute
-  PortalProductsRoute: typeof PortalProductsRoute
-  PortalProfileRoute: typeof PortalProfileRoute
-  PortalServicesRoute: typeof PortalServicesRoute
-  PortalIndexRoute: typeof PortalIndexRoute
-}
-
-const PortalRouteChildren: PortalRouteChildren = {
-  PortalHappeningsRoute: PortalHappeningsRoute,
-  PortalLocationsRoute: PortalLocationsRoute,
-  PortalOffersRoute: PortalOffersRoute,
-  PortalProductsRoute: PortalProductsRoute,
-  PortalProfileRoute: PortalProfileRoute,
-  PortalServicesRoute: PortalServicesRoute,
-  PortalIndexRoute: PortalIndexRoute,
-}
-
-const PortalRouteWithChildren =
-  PortalRoute._addFileChildren(PortalRouteChildren)
-
 interface AdminMerchantsRouteChildren {
   AdminMerchantsIdRoute: typeof AdminMerchantsIdRoute
 }
@@ -491,9 +477,19 @@ const AdminWebsitesRouteWithChildren = AdminWebsitesRoute._addFileChildren(
   AdminWebsitesRouteChildren,
 )
 
-const rootRouteChildren: RootRouteChildren = {
-  PortalRoute: PortalRouteWithChildren,
-  SigninRoute: SigninRoute,
+interface AdminRouteChildren {
+  AdminCommerceRoute: typeof AdminCommerceRoute
+  AdminDiscoveryRoute: typeof AdminDiscoveryRoute
+  AdminHappeningsRoute: typeof AdminHappeningsRoute
+  AdminMerchantsRoute: typeof AdminMerchantsRouteWithChildren
+  AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminSystemRoute: typeof AdminSystemRoute
+  AdminVisibilityRoute: typeof AdminVisibilityRoute
+  AdminWebsitesRoute: typeof AdminWebsitesRouteWithChildren
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
   AdminCommerceRoute: AdminCommerceRoute,
   AdminDiscoveryRoute: AdminDiscoveryRoute,
   AdminHappeningsRoute: AdminHappeningsRoute,
@@ -502,8 +498,39 @@ const rootRouteChildren: RootRouteChildren = {
   AdminSystemRoute: AdminSystemRoute,
   AdminVisibilityRoute: AdminVisibilityRoute,
   AdminWebsitesRoute: AdminWebsitesRouteWithChildren,
-  PMerchantSlugRoute: PMerchantSlugRoute,
   AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
+interface PortalRouteChildren {
+  PortalHappeningsRoute: typeof PortalHappeningsRoute
+  PortalLocationsRoute: typeof PortalLocationsRoute
+  PortalOffersRoute: typeof PortalOffersRoute
+  PortalProductsRoute: typeof PortalProductsRoute
+  PortalProfileRoute: typeof PortalProfileRoute
+  PortalServicesRoute: typeof PortalServicesRoute
+  PortalIndexRoute: typeof PortalIndexRoute
+}
+
+const PortalRouteChildren: PortalRouteChildren = {
+  PortalHappeningsRoute: PortalHappeningsRoute,
+  PortalLocationsRoute: PortalLocationsRoute,
+  PortalOffersRoute: PortalOffersRoute,
+  PortalProductsRoute: PortalProductsRoute,
+  PortalProfileRoute: PortalProfileRoute,
+  PortalServicesRoute: PortalServicesRoute,
+  PortalIndexRoute: PortalIndexRoute,
+}
+
+const PortalRouteWithChildren =
+  PortalRoute._addFileChildren(PortalRouteChildren)
+
+const rootRouteChildren: RootRouteChildren = {
+  AdminRoute: AdminRouteWithChildren,
+  PortalRoute: PortalRouteWithChildren,
+  SigninRoute: SigninRoute,
+  PMerchantSlugRoute: PMerchantSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
