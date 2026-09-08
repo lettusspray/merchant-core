@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { MerchantDetailPage } from "@/components/merchants/merchant-detail-page";
 
-export const Route = createFileRoute("/merchants/$id")({
+export const Route = createFileRoute("/admin/merchants/$id")({
   component: MerchantDetailRoute,
 });
 

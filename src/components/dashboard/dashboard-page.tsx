@@ -48,31 +48,31 @@ function MetricCard({ label, value, hint }: { label: string; value: string; hint
 
 const QUICK_ACTIONS = [
   {
-    to: "/merchants",
+    to: "/admin/merchants",
     label: "Merchants",
     description: "Browse and manage merchant records",
     icon: Store,
   },
   {
-    to: "/discovery",
+    to: "/admin/discovery",
     label: "Discovery",
     description: "Find and source new prospects",
     icon: Compass,
   },
   {
-    to: "/happenings",
+    to: "/admin/happenings",
     label: "Happenings",
     description: "Review the content & update queue",
     icon: Webhook,
   },
   {
-    to: "/visibility",
+    to: "/admin/visibility",
     label: "AI Visibility",
     description: "Track visibility runs and results",
     icon: Eye,
   },
   {
-    to: "/commerce",
+    to: "/admin/commerce",
     label: "Commerce",
     description: "Orders, subscriptions and payments",
     icon: ShoppingCart,
@@ -168,21 +168,21 @@ function NeedsAttention({ snapshot }: { snapshot: Snapshot }) {
     items.push({
       label: "Happenings awaiting review",
       count: counts.pendingContent,
-      to: "/happenings?status=in_review",
+      to: "/admin/happenings?status=in_review",
     });
   }
   if (counts.prospects > 0) {
     items.push({
       label: "New discovery candidates",
       count: counts.prospects,
-      to: "/discovery",
+      to: "/admin/discovery",
     });
   }
   if (failedWorkflows.length > 0) {
     items.push({
       label: "Failed workflow runs",
       count: failedWorkflows.length,
-      to: "/system",
+      to: "/admin/system",
     });
   }
 
@@ -271,7 +271,7 @@ function AcquisitionSection({ snapshot }: { snapshot: Snapshot }) {
           <CardTitle className="flex items-center justify-between text-base">
             <span>Acquisition activity</span>
             <Button asChild size="sm" variant="ghost">
-              <Link to="/discovery">
+              <Link to="/admin/discovery">
                 Open discovery
                 <ArrowUpRight className="size-4" />
               </Link>

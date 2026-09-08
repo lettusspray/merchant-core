@@ -123,7 +123,7 @@ function MerchantNameLink({ merchantId, name }: { merchantId: string; name: stri
   if (!name) {
     return (
       <Link
-        to="/merchants/$id"
+        to="/admin/merchants/$id"
         params={{ id: merchantId }}
         className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline"
       >
@@ -134,7 +134,7 @@ function MerchantNameLink({ merchantId, name }: { merchantId: string; name: stri
   }
   return (
     <Link
-      to="/merchants/$id"
+      to="/admin/merchants/$id"
       params={{ id: merchantId }}
       className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline"
     >

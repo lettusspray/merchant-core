@@ -194,7 +194,7 @@ export function WebsitesPage() {
                       <TableRow key={website.id}>
                         <TableCell>
                           <Link
-                            to="/websites/$id"
+                            to="/admin/websites/$id"
                             params={{ id: website.id }}
                             className="font-medium text-primary hover:underline"
                           >

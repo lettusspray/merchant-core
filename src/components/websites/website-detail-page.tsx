@@ -162,7 +162,7 @@ export function WebsiteDetailPage({ websiteId }: { websiteId: string }) {
       <div className="space-y-4">
         <div>
           <Link
-            to="/websites"
+            to="/admin/websites"
             className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="size-4" />
@@ -347,7 +347,7 @@ export function WebsiteDetailPage({ websiteId }: { websiteId: string }) {
                 <p className="text-xs font-medium text-muted-foreground">Merchant</p>
                 {merchant ? (
                   <Link
-                    to="/merchants/$id"
+                    to="/admin/merchants/$id"
                     params={{ id: merchant.id }}
                     className="font-medium text-primary hover:underline"
                   >

@@ -10,17 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as CommerceRouteImport } from './routes/commerce'
-import { Route as DiscoveryRouteImport } from './routes/discovery'
-import { Route as HappeningsRouteImport } from './routes/happenings'
-import { Route as MerchantsRouteImport } from './routes/merchants'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as PortalRouteImport } from './routes/portal'
-import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SigninRouteImport } from './routes/signin'
-import { Route as SystemRouteImport } from './routes/system'
-import { Route as VisibilityRouteImport } from './routes/visibility'
-import { Route as WebsitesRouteImport } from './routes/websites'
-import { Route as MerchantsIdRouteImport } from './routes/merchants.$id'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminCommerceRouteImport } from './routes/admin.commerce'
+import { Route as AdminDiscoveryRouteImport } from './routes/admin.discovery'
+import { Route as AdminHappeningsRouteImport } from './routes/admin.happenings'
+import { Route as AdminMerchantsRouteImport } from './routes/admin.merchants'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
+import { Route as AdminSystemRouteImport } from './routes/admin.system'
+import { Route as AdminVisibilityRouteImport } from './routes/admin.visibility'
+import { Route as AdminWebsitesRouteImport } from './routes/admin.websites'
 import { Route as PMerchantSlugRouteImport } from './routes/p.$merchantSlug'
 import { Route as PortalIndexRouteImport } from './routes/portal.index'
 import { Route as PortalHappeningsRouteImport } from './routes/portal.happenings'
@@ -29,31 +30,17 @@ import { Route as PortalOffersRouteImport } from './routes/portal.offers'
 import { Route as PortalProductsRouteImport } from './routes/portal.products'
 import { Route as PortalProfileRouteImport } from './routes/portal.profile'
 import { Route as PortalServicesRouteImport } from './routes/portal.services'
-import { Route as WebsitesIdRouteImport } from './routes/websites.$id'
+import { Route as AdminMerchantsIdRouteImport } from './routes/admin.merchants.$id'
+import { Route as AdminWebsitesIdRouteImport } from './routes/admin.websites.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CommerceRoute = CommerceRouteImport.update({
-  id: '/commerce',
-  path: '/commerce',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DiscoveryRoute = DiscoveryRouteImport.update({
-  id: '/discovery',
-  path: '/discovery',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HappeningsRoute = HappeningsRouteImport.update({
-  id: '/happenings',
-  path: '/happenings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MerchantsRoute = MerchantsRouteImport.update({
-  id: '/merchants',
-  path: '/merchants',
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PortalRoute = PortalRouteImport.update({
@@ -61,35 +48,55 @@ const PortalRoute = PortalRouteImport.update({
   path: '/portal',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SigninRoute = SigninRouteImport.update({
   id: '/signin',
   path: '/signin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SystemRoute = SystemRouteImport.update({
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCommerceRoute = AdminCommerceRouteImport.update({
+  id: '/commerce',
+  path: '/commerce',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminDiscoveryRoute = AdminDiscoveryRouteImport.update({
+  id: '/discovery',
+  path: '/discovery',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminHappeningsRoute = AdminHappeningsRouteImport.update({
+  id: '/happenings',
+  path: '/happenings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminMerchantsRoute = AdminMerchantsRouteImport.update({
+  id: '/merchants',
+  path: '/merchants',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSystemRoute = AdminSystemRouteImport.update({
   id: '/system',
   path: '/system',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AdminRoute,
 } as any)
-const VisibilityRoute = VisibilityRouteImport.update({
+const AdminVisibilityRoute = AdminVisibilityRouteImport.update({
   id: '/visibility',
   path: '/visibility',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AdminRoute,
 } as any)
-const WebsitesRoute = WebsitesRouteImport.update({
+const AdminWebsitesRoute = AdminWebsitesRouteImport.update({
   id: '/websites',
   path: '/websites',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MerchantsIdRoute = MerchantsIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => MerchantsRoute,
+  getParentRoute: () => AdminRoute,
 } as any)
 const PMerchantSlugRoute = PMerchantSlugRouteImport.update({
   id: '/p/$merchantSlug',
@@ -131,25 +138,30 @@ const PortalServicesRoute = PortalServicesRouteImport.update({
   path: '/services',
   getParentRoute: () => PortalRoute,
 } as any)
-const WebsitesIdRoute = WebsitesIdRouteImport.update({
+const AdminMerchantsIdRoute = AdminMerchantsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
-  getParentRoute: () => WebsitesRoute,
+  getParentRoute: () => AdminMerchantsRoute,
+} as any)
+const AdminWebsitesIdRoute = AdminWebsitesIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AdminWebsitesRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/commerce': typeof CommerceRoute
-  '/discovery': typeof DiscoveryRoute
-  '/happenings': typeof HappeningsRoute
-  '/merchants': typeof MerchantsRouteWithChildren
+  '/admin': typeof AdminRouteWithChildren
   '/portal': typeof PortalRouteWithChildren
-  '/settings': typeof SettingsRoute
   '/signin': typeof SigninRoute
-  '/system': typeof SystemRoute
-  '/visibility': typeof VisibilityRoute
-  '/websites': typeof WebsitesRouteWithChildren
-  '/merchants/$id': typeof MerchantsIdRoute
+  '/admin/commerce': typeof AdminCommerceRoute
+  '/admin/discovery': typeof AdminDiscoveryRoute
+  '/admin/happenings': typeof AdminHappeningsRoute
+  '/admin/merchants': typeof AdminMerchantsRouteWithChildren
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/system': typeof AdminSystemRoute
+  '/admin/visibility': typeof AdminVisibilityRoute
+  '/admin/websites': typeof AdminWebsitesRouteWithChildren
   '/p/$merchantSlug': typeof PMerchantSlugRoute
   '/portal/happenings': typeof PortalHappeningsRoute
   '/portal/locations': typeof PortalLocationsRoute
@@ -157,21 +169,22 @@ export interface FileRoutesByFullPath {
   '/portal/products': typeof PortalProductsRoute
   '/portal/profile': typeof PortalProfileRoute
   '/portal/services': typeof PortalServicesRoute
-  '/websites/$id': typeof WebsitesIdRoute
+  '/admin/': typeof AdminIndexRoute
   '/portal/': typeof PortalIndexRoute
+  '/admin/merchants/$id': typeof AdminMerchantsIdRoute
+  '/admin/websites/$id': typeof AdminWebsitesIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/commerce': typeof CommerceRoute
-  '/discovery': typeof DiscoveryRoute
-  '/happenings': typeof HappeningsRoute
-  '/merchants': typeof MerchantsRouteWithChildren
-  '/settings': typeof SettingsRoute
   '/signin': typeof SigninRoute
-  '/system': typeof SystemRoute
-  '/visibility': typeof VisibilityRoute
-  '/websites': typeof WebsitesRouteWithChildren
-  '/merchants/$id': typeof MerchantsIdRoute
+  '/admin/commerce': typeof AdminCommerceRoute
+  '/admin/discovery': typeof AdminDiscoveryRoute
+  '/admin/happenings': typeof AdminHappeningsRoute
+  '/admin/merchants': typeof AdminMerchantsRouteWithChildren
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/system': typeof AdminSystemRoute
+  '/admin/visibility': typeof AdminVisibilityRoute
+  '/admin/websites': typeof AdminWebsitesRouteWithChildren
   '/p/$merchantSlug': typeof PMerchantSlugRoute
   '/portal/happenings': typeof PortalHappeningsRoute
   '/portal/locations': typeof PortalLocationsRoute
@@ -179,23 +192,25 @@ export interface FileRoutesByTo {
   '/portal/products': typeof PortalProductsRoute
   '/portal/profile': typeof PortalProfileRoute
   '/portal/services': typeof PortalServicesRoute
-  '/websites/$id': typeof WebsitesIdRoute
+  '/admin': typeof AdminIndexRoute
   '/portal': typeof PortalIndexRoute
+  '/admin/merchants/$id': typeof AdminMerchantsIdRoute
+  '/admin/websites/$id': typeof AdminWebsitesIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/commerce': typeof CommerceRoute
-  '/discovery': typeof DiscoveryRoute
-  '/happenings': typeof HappeningsRoute
-  '/merchants': typeof MerchantsRouteWithChildren
+  '/admin': typeof AdminRouteWithChildren
   '/portal': typeof PortalRouteWithChildren
-  '/settings': typeof SettingsRoute
   '/signin': typeof SigninRoute
-  '/system': typeof SystemRoute
-  '/visibility': typeof VisibilityRoute
-  '/websites': typeof WebsitesRouteWithChildren
-  '/merchants/$id': typeof MerchantsIdRoute
+  '/admin/commerce': typeof AdminCommerceRoute
+  '/admin/discovery': typeof AdminDiscoveryRoute
+  '/admin/happenings': typeof AdminHappeningsRoute
+  '/admin/merchants': typeof AdminMerchantsRouteWithChildren
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/system': typeof AdminSystemRoute
+  '/admin/visibility': typeof AdminVisibilityRoute
+  '/admin/websites': typeof AdminWebsitesRouteWithChildren
   '/p/$merchantSlug': typeof PMerchantSlugRoute
   '/portal/happenings': typeof PortalHappeningsRoute
   '/portal/locations': typeof PortalLocationsRoute
@@ -203,24 +218,26 @@ export interface FileRoutesById {
   '/portal/products': typeof PortalProductsRoute
   '/portal/profile': typeof PortalProfileRoute
   '/portal/services': typeof PortalServicesRoute
-  '/websites/$id': typeof WebsitesIdRoute
+  '/admin/': typeof AdminIndexRoute
   '/portal/': typeof PortalIndexRoute
+  '/admin/merchants/$id': typeof AdminMerchantsIdRoute
+  '/admin/websites/$id': typeof AdminWebsitesIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/commerce'
-    | '/discovery'
-    | '/happenings'
-    | '/merchants'
+    | '/admin'
     | '/portal'
-    | '/settings'
     | '/signin'
-    | '/system'
-    | '/visibility'
-    | '/websites'
-    | '/merchants/$id'
+    | '/admin/commerce'
+    | '/admin/discovery'
+    | '/admin/happenings'
+    | '/admin/merchants'
+    | '/admin/settings'
+    | '/admin/system'
+    | '/admin/visibility'
+    | '/admin/websites'
     | '/p/$merchantSlug'
     | '/portal/happenings'
     | '/portal/locations'
@@ -228,21 +245,22 @@ export interface FileRouteTypes {
     | '/portal/products'
     | '/portal/profile'
     | '/portal/services'
-    | '/websites/$id'
+    | '/admin/'
     | '/portal/'
+    | '/admin/merchants/$id'
+    | '/admin/websites/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/commerce'
-    | '/discovery'
-    | '/happenings'
-    | '/merchants'
-    | '/settings'
     | '/signin'
-    | '/system'
-    | '/visibility'
-    | '/websites'
-    | '/merchants/$id'
+    | '/admin/commerce'
+    | '/admin/discovery'
+    | '/admin/happenings'
+    | '/admin/merchants'
+    | '/admin/settings'
+    | '/admin/system'
+    | '/admin/visibility'
+    | '/admin/websites'
     | '/p/$merchantSlug'
     | '/portal/happenings'
     | '/portal/locations'
@@ -250,22 +268,24 @@ export interface FileRouteTypes {
     | '/portal/products'
     | '/portal/profile'
     | '/portal/services'
-    | '/websites/$id'
+    | '/admin'
     | '/portal'
+    | '/admin/merchants/$id'
+    | '/admin/websites/$id'
   id:
     | '__root__'
     | '/'
-    | '/commerce'
-    | '/discovery'
-    | '/happenings'
-    | '/merchants'
+    | '/admin'
     | '/portal'
-    | '/settings'
     | '/signin'
-    | '/system'
-    | '/visibility'
-    | '/websites'
-    | '/merchants/$id'
+    | '/admin/commerce'
+    | '/admin/discovery'
+    | '/admin/happenings'
+    | '/admin/merchants'
+    | '/admin/settings'
+    | '/admin/system'
+    | '/admin/visibility'
+    | '/admin/websites'
     | '/p/$merchantSlug'
     | '/portal/happenings'
     | '/portal/locations'
@@ -273,22 +293,17 @@ export interface FileRouteTypes {
     | '/portal/products'
     | '/portal/profile'
     | '/portal/services'
-    | '/websites/$id'
+    | '/admin/'
     | '/portal/'
+    | '/admin/merchants/$id'
+    | '/admin/websites/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  CommerceRoute: typeof CommerceRoute
-  DiscoveryRoute: typeof DiscoveryRoute
-  HappeningsRoute: typeof HappeningsRoute
-  MerchantsRoute: typeof MerchantsRouteWithChildren
+  AdminRoute: typeof AdminRouteWithChildren
   PortalRoute: typeof PortalRouteWithChildren
-  SettingsRoute: typeof SettingsRoute
   SigninRoute: typeof SigninRoute
-  SystemRoute: typeof SystemRoute
-  VisibilityRoute: typeof VisibilityRoute
-  WebsitesRoute: typeof WebsitesRouteWithChildren
   PMerchantSlugRoute: typeof PMerchantSlugRoute
 }
 
@@ -301,32 +316,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/commerce': {
-      id: '/commerce'
-      path: '/commerce'
-      fullPath: '/commerce'
-      preLoaderRoute: typeof CommerceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/discovery': {
-      id: '/discovery'
-      path: '/discovery'
-      fullPath: '/discovery'
-      preLoaderRoute: typeof DiscoveryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/happenings': {
-      id: '/happenings'
-      path: '/happenings'
-      fullPath: '/happenings'
-      preLoaderRoute: typeof HappeningsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/merchants': {
-      id: '/merchants'
-      path: '/merchants'
-      fullPath: '/merchants'
-      preLoaderRoute: typeof MerchantsRouteImport
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/portal': {
@@ -336,13 +330,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortalRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/signin': {
       id: '/signin'
       path: '/signin'
@@ -350,33 +337,68 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SigninRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/system': {
-      id: '/system'
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/commerce': {
+      id: '/admin/commerce'
+      path: '/commerce'
+      fullPath: '/admin/commerce'
+      preLoaderRoute: typeof AdminCommerceRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/discovery': {
+      id: '/admin/discovery'
+      path: '/discovery'
+      fullPath: '/admin/discovery'
+      preLoaderRoute: typeof AdminDiscoveryRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/happenings': {
+      id: '/admin/happenings'
+      path: '/happenings'
+      fullPath: '/admin/happenings'
+      preLoaderRoute: typeof AdminHappeningsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/merchants': {
+      id: '/admin/merchants'
+      path: '/merchants'
+      fullPath: '/admin/merchants'
+      preLoaderRoute: typeof AdminMerchantsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/system': {
+      id: '/admin/system'
       path: '/system'
-      fullPath: '/system'
-      preLoaderRoute: typeof SystemRouteImport
-      parentRoute: typeof rootRouteImport
+      fullPath: '/admin/system'
+      preLoaderRoute: typeof AdminSystemRouteImport
+      parentRoute: typeof AdminRoute
     }
-    '/visibility': {
-      id: '/visibility'
+    '/admin/visibility': {
+      id: '/admin/visibility'
       path: '/visibility'
-      fullPath: '/visibility'
-      preLoaderRoute: typeof VisibilityRouteImport
-      parentRoute: typeof rootRouteImport
+      fullPath: '/admin/visibility'
+      preLoaderRoute: typeof AdminVisibilityRouteImport
+      parentRoute: typeof AdminRoute
     }
-    '/websites': {
-      id: '/websites'
+    '/admin/websites': {
+      id: '/admin/websites'
       path: '/websites'
-      fullPath: '/websites'
-      preLoaderRoute: typeof WebsitesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/merchants/$id': {
-      id: '/merchants/$id'
-      path: '/$id'
-      fullPath: '/merchants/$id'
-      preLoaderRoute: typeof MerchantsIdRouteImport
-      parentRoute: typeof MerchantsRoute
+      fullPath: '/admin/websites'
+      preLoaderRoute: typeof AdminWebsitesRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/p/$merchantSlug': {
       id: '/p/$merchantSlug'
@@ -434,27 +456,72 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortalServicesRouteImport
       parentRoute: typeof PortalRoute
     }
-    '/websites/$id': {
-      id: '/websites/$id'
+    '/admin/merchants/$id': {
+      id: '/admin/merchants/$id'
       path: '/$id'
-      fullPath: '/websites/$id'
-      preLoaderRoute: typeof WebsitesIdRouteImport
-      parentRoute: typeof WebsitesRoute
+      fullPath: '/admin/merchants/$id'
+      preLoaderRoute: typeof AdminMerchantsIdRouteImport
+      parentRoute: typeof AdminMerchantsRoute
+    }
+    '/admin/websites/$id': {
+      id: '/admin/websites/$id'
+      path: '/$id'
+      fullPath: '/admin/websites/$id'
+      preLoaderRoute: typeof AdminWebsitesIdRouteImport
+      parentRoute: typeof AdminWebsitesRoute
     }
   }
 }
 
-interface MerchantsRouteChildren {
-  MerchantsIdRoute: typeof MerchantsIdRoute
+interface AdminMerchantsRouteChildren {
+  AdminMerchantsIdRoute: typeof AdminMerchantsIdRoute
 }
 
-const MerchantsRouteChildren: MerchantsRouteChildren = {
-  MerchantsIdRoute: MerchantsIdRoute,
+const AdminMerchantsRouteChildren: AdminMerchantsRouteChildren = {
+  AdminMerchantsIdRoute: AdminMerchantsIdRoute,
 }
 
-const MerchantsRouteWithChildren = MerchantsRoute._addFileChildren(
-  MerchantsRouteChildren,
+const AdminMerchantsRouteWithChildren = AdminMerchantsRoute._addFileChildren(
+  AdminMerchantsRouteChildren,
 )
+
+interface AdminWebsitesRouteChildren {
+  AdminWebsitesIdRoute: typeof AdminWebsitesIdRoute
+}
+
+const AdminWebsitesRouteChildren: AdminWebsitesRouteChildren = {
+  AdminWebsitesIdRoute: AdminWebsitesIdRoute,
+}
+
+const AdminWebsitesRouteWithChildren = AdminWebsitesRoute._addFileChildren(
+  AdminWebsitesRouteChildren,
+)
+
+interface AdminRouteChildren {
+  AdminCommerceRoute: typeof AdminCommerceRoute
+  AdminDiscoveryRoute: typeof AdminDiscoveryRoute
+  AdminHappeningsRoute: typeof AdminHappeningsRoute
+  AdminMerchantsRoute: typeof AdminMerchantsRouteWithChildren
+  AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminSystemRoute: typeof AdminSystemRoute
+  AdminVisibilityRoute: typeof AdminVisibilityRoute
+  AdminWebsitesRoute: typeof AdminWebsitesRouteWithChildren
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminCommerceRoute: AdminCommerceRoute,
+  AdminDiscoveryRoute: AdminDiscoveryRoute,
+  AdminHappeningsRoute: AdminHappeningsRoute,
+  AdminMerchantsRoute: AdminMerchantsRouteWithChildren,
+  AdminSettingsRoute: AdminSettingsRoute,
+  AdminSystemRoute: AdminSystemRoute,
+  AdminVisibilityRoute: AdminVisibilityRoute,
+  AdminWebsitesRoute: AdminWebsitesRouteWithChildren,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface PortalRouteChildren {
   PortalHappeningsRoute: typeof PortalHappeningsRoute
@@ -479,30 +546,11 @@ const PortalRouteChildren: PortalRouteChildren = {
 const PortalRouteWithChildren =
   PortalRoute._addFileChildren(PortalRouteChildren)
 
-interface WebsitesRouteChildren {
-  WebsitesIdRoute: typeof WebsitesIdRoute
-}
-
-const WebsitesRouteChildren: WebsitesRouteChildren = {
-  WebsitesIdRoute: WebsitesIdRoute,
-}
-
-const WebsitesRouteWithChildren = WebsitesRoute._addFileChildren(
-  WebsitesRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  CommerceRoute: CommerceRoute,
-  DiscoveryRoute: DiscoveryRoute,
-  HappeningsRoute: HappeningsRoute,
-  MerchantsRoute: MerchantsRouteWithChildren,
+  AdminRoute: AdminRouteWithChildren,
   PortalRoute: PortalRouteWithChildren,
-  SettingsRoute: SettingsRoute,
   SigninRoute: SigninRoute,
-  SystemRoute: SystemRoute,
-  VisibilityRoute: VisibilityRoute,
-  WebsitesRoute: WebsitesRouteWithChildren,
   PMerchantSlugRoute: PMerchantSlugRoute,
 }
 export const routeTree = rootRouteImport

@@ -216,7 +216,7 @@ function HappeningRow({
         <TableCell>
           {merchant ? (
             <Link
-              to="/merchants/$id"
+              to="/admin/merchants/$id"
               params={{ id: happening.merchant_id }}
               onClick={(event) => event.stopPropagation()}
               className="inline-flex items-center gap-1 font-medium text-primary underline-offset-4 hover:underline"
